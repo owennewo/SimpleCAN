@@ -59,34 +59,13 @@ HAL_StatusTypeDef SimpleCan::stop(){
    	return HAL_CAN_Stop(&hcan);
 
 }
-HAL_StatusTypeDef SimpleCan::configFilter(CAN_FilterTypeDef *filterDef){
 
-  CAN_FilterTypeDef sFilterConfig;
-  sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-  sFilterConfig.FilterIdHigh = 0x244 << 5;
-  sFilterConfig.FilterIdLow = 0;
-  sFilterConfig.FilterMaskIdHigh = 0;
-  sFilterConfig.FilterMaskIdLow = 0;
-  sFilterConfig.FilterScale= CAN_FILTERSCALE_32BIT;
-  sFilterConfig.FilterActivation = ENABLE;
-
-    return HAL_CAN_ConfigFilter(&hcan, &sFilterConfig);
+HAL_StatusTypeDef SimpleCan::filterAcceptAll(){
+  return filter(&FILTER_ACCEPT_ALL);
 }
-HAL_StatusTypeDef SimpleCan::configSnifferFilter(){
 
-    CAN_FilterTypeDef sFilterConfig;
-
-  sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-  sFilterConfig.FilterIdHigh = 0x244 << 5;
-  sFilterConfig.FilterIdLow = 0;
-  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-  sFilterConfig.FilterMaskIdHigh = 0;
-  sFilterConfig.FilterMaskIdLow = 0;
-  sFilterConfig.FilterScale= CAN_FILTERSCALE_32BIT;
-  sFilterConfig.FilterActivation = ENABLE;
-
-
-    return HAL_CAN_ConfigFilter(&hcan, &sFilterConfig);
+HAL_StatusTypeDef SimpleCan::filter(CAN_FilterTypeDef *filterDef){
+  return HAL_CAN_ConfigFilter(&hcan, filterDef);
 }
 
 HAL_StatusTypeDef SimpleCan::send(CanMessage message){
@@ -102,10 +81,8 @@ HAL_StatusTypeDef SimpleCan::send(CanMessage message){
     TxHeader.IDE = CAN_ID_STD;
     TxHeader.RTR = CAN_RTR_DATA;
 
-    return HAL_CAN_AddTxMessage(&hcan, &TxHeader, &data, &TxMailbox);
-    
+    return HAL_CAN_AddTxMessage(&hcan, &TxHeader, &data, &TxMailbox);    
 }
-
 
 HAL_StatusTypeDef SimpleCan::activateNotification( RxHandler *rxHandler)
 {
@@ -114,17 +91,9 @@ HAL_StatusTypeDef SimpleCan::activateNotification( RxHandler *rxHandler)
 		return HAL_ERROR;
 	}
 
-    // nvic.enable_with_prio(spi_rx_dma.get_irqn(), 4);
-    // nvic.enable_with_prio(spi_tx_dma.get_irqn(), 3);
-
-    // HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, &messageCallback);
-    // HAL_CAN_RegisterCallback(&hcan, HAL_CAN_TX_MAILBOX0_COMPLETE_CB_ID, HAL_CAN_TxMailbox0CompleteCallback);
-    // HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_MSG_PENDING_CB_ID, HAL_CAN_RxFifo0MsgPendingCallback);
-    // HAL_CAN_RegisterCallback(&hcan, HAL_CAN_RX_FIFO0_FULL_CB_ID, HAL_CAN_RxFifo0FullCallback);
 
     HAL_NVIC_SetPriority(CAN1_RX1_IRQn, 0, 1);
     HAL_NVIC_EnableIRQ(CAN1_RX1_IRQn);
-    
 
 	_rxHandler = rxHandler;
 	return HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
@@ -135,37 +104,23 @@ HAL_StatusTypeDef SimpleCan::deactivateNotification(){
    // _rxHandler = NULL;
     return HAL_CAN_DeactivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
 }
-//       RxHandler   Implementation
 
 SimpleCan::RxHandler::RxHandler(uint16_t dataLength, void (*callback)(CAN_RxHeaderTypeDef, uint8_t *))
 {
 	_rxData = new byte[dataLength];
 	_callback = callback;
 }
+
 SimpleCan::RxHandler::~RxHandler()
 {
 	delete[] _rxData;
 }
 
-
 void SimpleCan::RxHandler::notify(CAN_HandleTypeDef *hcan1)
 {
-
     if (SimpleCan::_rxHandler == NULL)
     {
         return;
     }
     SimpleCan::_rxHandler->notify(hcan1);
 }
-
-// void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan1)
-// {
-//    digitalToggle(PC13);
-
-//     if (SimpleCan::_rxHandler == NULL)
-//     {
-//         return;
-//     }
-//     SimpleCan::_rxHandler->notify(hcan1);
-
-// }

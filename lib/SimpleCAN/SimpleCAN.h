@@ -3,6 +3,7 @@
 
 #include "Arduino.h"
 #include "stm32f4xx_hal_can.h"
+#include "example_can.h"
 
 
 // Value needed for prescaler. depends 
@@ -35,6 +36,15 @@ typedef struct{
   uint8_t data[8];
 }CanMessage;
 
+static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
+    .FilterMaskIdHigh = 0,
+    .FilterMaskIdLow = 0,
+    .FilterFIFOAssignment = CAN_FILTER_FIFO0,
+    .FilterMode = CAN_FILTERMODE_IDMASK,
+    .FilterScale= CAN_FILTERSCALE_32BIT,
+    .FilterActivation = ENABLE,
+  };
+
 
 CanMessage createMessage(void);
 /**
@@ -58,8 +68,9 @@ public:
 
 	SimpleCan();
 	HAL_StatusTypeDef init(CanSpeed speed, CanMode mode);
-	HAL_StatusTypeDef configFilter(CAN_FilterTypeDef *filterDef);
-  HAL_StatusTypeDef configSnifferFilter();
+	HAL_StatusTypeDef filter(CAN_FilterTypeDef *filter);
+	HAL_StatusTypeDef filterAcceptAll();
+//   HAL_StatusTypeDef configSnifferFilter();
 	HAL_StatusTypeDef activateNotification(RxHandler *rxHandler);
 	HAL_StatusTypeDef deactivateNotification();
 	HAL_StatusTypeDef begin();

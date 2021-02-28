@@ -59,14 +59,15 @@ void setup() {
 
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
-  
+
   Serial.begin(115200);
   delay(1000);
   Serial.println("Setup");
 
   pinMode(PC13,OUTPUT);
   can.init(Kbit250,CanMode::LoopBackCan);
-  can.configSnifferFilter();
+
+  can.filterAcceptAll();
   can.activateNotification(&can1RxHandler);
   can.begin();
 }
