@@ -66,7 +66,7 @@ public:
 	HAL_StatusTypeDef stop();
 	HAL_StatusTypeDef send(CanMessage message);
   //private: interrupt handler needs access to it
-  CAN_HandleTypeDef hcan;
+  static CAN_HandleTypeDef hcan;
   static RxHandler *_rxHandler;
 
 };

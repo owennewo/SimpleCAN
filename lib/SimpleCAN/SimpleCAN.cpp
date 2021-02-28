@@ -9,46 +9,27 @@
 
 SimpleCan::RxHandler* SimpleCan::_rxHandler = NULL;
 
-
+CAN_HandleTypeDef SimpleCan::hcan = {
+  .Instance = CAN1,
+  .Init = {
+        .Prescaler = 21,
+        .Mode = CAN_MODE_NORMAL,
+        .SyncJumpWidth = CAN_SJW_1TQ,
+        .TimeSeg1 = CAN_BS1_12TQ,
+        .TimeSeg2 = CAN_BS2_4TQ,
+        .TimeTriggeredMode = DISABLE,
+        .AutoBusOff = DISABLE,
+        .AutoWakeUp = DISABLE,
+        .AutoRetransmission = DISABLE,
+        .ReceiveFifoLocked = DISABLE,
+        .TransmitFifoPriority = DISABLE,
+  }
+};
 
 void messageCallback(CAN_HandleTypeDef *CanHandle) {
     Serial.println("message");
     digitalWrite(PC5, !digitalRead(PC5));
 }
-
-
-// void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan1)
-// {
-//   GPIO_InitTypeDef GPIO_InitStruct = {0};
-//   if(hcan1->Instance==CAN1)
-//   {
-//   /* USER CODE BEGIN CAN1_MspInit 0 */
-
-//   /* USER CODE END CAN1_MspInit 0 */
-//     /* Peripheral clock enable */
-//     __HAL_RCC_CAN1_CLK_ENABLE();
-
-//     __HAL_RCC_GPIOB_CLK_ENABLE();
-//     /**CAN1 GPIO Configuration
-//     PB8     ------> CAN1_RX
-//     PB9     ------> CAN1_TX
-//     */
-//     GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
-//     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-//     GPIO_InitStruct.Pull = GPIO_NOPULL;
-//     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-//     GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
-//     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-//     /* CAN1 interrupt Init */
-//     HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 0, 0);
-//     HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
-//     /* USER CODE BEGIN CAN1_MspInit 1 */
-
-//     /* USER CODE END CAN1_MspInit 1 */
-//   }
-
-// }
 
 CanMessage createMessage(){
   CanMessage message;
@@ -66,43 +47,6 @@ SimpleCan::SimpleCan(){
     return;
 }
 HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode){
-  hcan.Instance = CAN1;
-//   hcan.Init.Prescaler = speed;
-//   hcan.Init.Mode = mode;
-//   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-//   hcan.Init.TimeSeg1 = CAN_BS1_8TQ;
-//   hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
-//   hcan.Init.TimeTriggeredMode = DISABLE;
-//   hcan.Init.AutoBusOff = DISABLE;
-//   hcan.Init.AutoWakeUp = DISABLE;
-//   hcan.Init.AutoRetransmission = DISABLE;
-//   hcan.Init.ReceiveFifoLocked = DISABLE;
-//   hcan.Init.TransmitFifoPriority = DISABLE;
-  
-            // hcan.Init.Prescaler = 8;
-            // hcan.Init.Mode = mode;
-            // hcan.Init.SyncJumpWidth = CAN_SJW_4TQ;
-            // hcan.Init.TimeSeg1 = CAN_BS1_16TQ;
-            // hcan.Init.TimeSeg2 = CAN_BS2_4TQ;
-            // hcan.Init.TimeTriggeredMode = DISABLE;
-            // hcan.Init.AutoBusOff = ENABLE;
-            // hcan.Init.AutoWakeUp = ENABLE;
-            // hcan.Init.AutoRetransmission = ENABLE;
-            // hcan.Init.ReceiveFifoLocked = DISABLE;
-            // hcan.Init.TransmitFifoPriority = DISABLE;
-
-hcan.Init.Prescaler = 21;
-  hcan.Init.Mode = CAN_MODE_NORMAL;
-  hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_12TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_4TQ;
-  hcan.Init.TimeTriggeredMode = DISABLE;
-  hcan.Init.AutoBusOff = DISABLE;
-  hcan.Init.AutoWakeUp = DISABLE;
-  hcan.Init.AutoRetransmission = DISABLE;
-  hcan.Init.ReceiveFifoLocked = DISABLE;
-  hcan.Init.TransmitFifoPriority = DISABLE;
-  
 
   return HAL_CAN_Init(&hcan);
 
@@ -117,21 +61,8 @@ HAL_StatusTypeDef SimpleCan::stop(){
 }
 HAL_StatusTypeDef SimpleCan::configFilter(CAN_FilterTypeDef *filterDef){
 
-    // Default filter - accept all to CAN_FIFO*
-    CAN_FilterTypeDef sFilterConfig;
-    // sFilterConfig.FilterBank = 0;
-    // sFilterConfig.FilterIdHigh = 0x00005;
-    // sFilterConfig.FilterBank = 0x0000;
-    // sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-    // sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-    // sFilterConfig.FilterIdHigh = 0x00 ;  // HE TOCADO ESTO !!!!!!!
-    // sFilterConfig.FilterIdLow  = 0x0000;
-    // sFilterConfig.FilterMaskIdHigh = 0x0000;
-    // sFilterConfig.FilterMaskIdLow = 0x0000;
-    // sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-    // sFilterConfig.FilterActivation = ENABLE;
-
-      sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+  CAN_FilterTypeDef sFilterConfig;
+  sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
   sFilterConfig.FilterIdHigh = 0x244 << 5;
   sFilterConfig.FilterIdLow = 0;
   sFilterConfig.FilterMaskIdHigh = 0;
@@ -143,19 +74,7 @@ HAL_StatusTypeDef SimpleCan::configFilter(CAN_FilterTypeDef *filterDef){
 }
 HAL_StatusTypeDef SimpleCan::configSnifferFilter(){
 
-    // Default filter - accept all to CAN_FIFO*
-	  CAN_FilterTypeDef sFilterConfig;
-	//   sFilterConfig.FilterBank = 0;
-	//   sFilterConfig.FilterIdHigh = 0x00005;
-	//   sFilterConfig.FilterBank = 0x0000;
-	//   sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-	//   sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-	//   sFilterConfig.FilterIdHigh = 0x200 << 5;  //11-bit ID, in top bits
-	//   sFilterConfig.FilterIdLow  = 0x0000;
-	//   sFilterConfig.FilterMaskIdHigh = 0x0000;
-	//   sFilterConfig.FilterMaskIdLow = 0x0000;
-	//   sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-	//   sFilterConfig.FilterActivation = ENABLE;
+    CAN_FilterTypeDef sFilterConfig;
 
   sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
   sFilterConfig.FilterIdHigh = 0x244 << 5;
@@ -183,35 +102,8 @@ HAL_StatusTypeDef SimpleCan::send(CanMessage message){
     TxHeader.IDE = CAN_ID_STD;
     TxHeader.RTR = CAN_RTR_DATA;
 
-    HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(&hcan, &TxHeader, &data, &TxMailbox);
-    // HAL_StatusTypeDef status = HAL_OK;
-    Serial.println(status);
-    // Serial.println(HAL_OK);
-    // delay(10); 
-    if( status != HAL_OK){
-        Serial.println("failed!");
-        delay(10);
-        Error_Handler();
-    }
-    return status;
-
-    // while(HAL_CAN_IsTxMessagePending(&hcan, TxMailbox));
-    // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    // HAL_Delay(1000);
-    // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    // HAL_Delay(1000);
+    return HAL_CAN_AddTxMessage(&hcan, &TxHeader, &data, &TxMailbox);
     
-    // uint32_t TxMailbox;
-	// CAN_TxHeaderTypeDef pHeader;
-    // pHeader.DLC= message.dlc;
-    // message.isStandard ? pHeader.IDE=CAN_ID_STD : pHeader.IDE=CAN_ID_EXT;
-    // message.isRTR ?  pHeader.RTR=CAN_RTR_REMOTE : pHeader.RTR=CAN_RTR_DATA;
-    // message.isStandard ? pHeader.StdId=0x200 : pHeader.ExtId=0x200;
-
-
-
-
-    // return HAL_CAN_AddTxMessage(&hcan, &pHeader, (uint8_t*)message.data, &TxMailbox);
 }
 
 
