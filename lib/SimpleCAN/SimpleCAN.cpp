@@ -7,6 +7,8 @@
 // extern "C" HAL_StatusTypeDef HAL_CAN_ActivateNotification(CAN_HandleTypeDef *, uint32_t );
 // extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *);
 
+
+
 SimpleCan::RxHandler* SimpleCan::_rxHandler = NULL;
 
 CAN_HandleTypeDef SimpleCan::hcan = {
@@ -124,3 +126,5 @@ void SimpleCan::RxHandler::notify(CAN_HandleTypeDef *hcan1)
     }
     SimpleCan::_rxHandler->notify(hcan1);
 }
+
+

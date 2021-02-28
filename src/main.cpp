@@ -6,14 +6,16 @@
 static void handleCanMessage(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData)
 {
   Serial.println("message received");
-	// digitalToggle(PC13);
 }
 
-SimpleCan::RxHandler can1RxHandler(8, handleCanMessage);
+extern "C" void CAN1_RX0_IRQHandler(void); 
+extern "C" void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan);
+extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan);
 
-SimpleCan can;
-
-extern "C" {
+void CAN1_RX0_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&SimpleCan::hcan);
+}
 
 void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan)
 {
@@ -48,11 +50,10 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
   // Serial.println(RxData);
 }
 
-void CAN1_RX0_IRQHandler(void)
-{
-  HAL_CAN_IRQHandler(&can.hcan);
-}
-}
+SimpleCan::RxHandler can1RxHandler(8, handleCanMessage);
+
+SimpleCan can;
+
 
 
 void setup() {
