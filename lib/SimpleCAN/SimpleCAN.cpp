@@ -1,13 +1,6 @@
 #include "SimpleCAN.h"
 #include <Arduino.h>
 
-// extern "C" HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef *);
-// extern "C" HAL_StatusTypeDef HAL_CAN_Stop (CAN_HandleTypeDef *);
-// extern "C" HAL_StatusTypeDef HAL_CAN_Init(CAN_HandleTypeDef *);
-// extern "C" HAL_StatusTypeDef HAL_CAN_ActivateNotification(CAN_HandleTypeDef *, uint32_t );
-// extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *);
-
-
 
 SimpleCan::RxHandler* SimpleCan::_rxHandler = NULL;
 
@@ -49,6 +42,28 @@ SimpleCan::SimpleCan(){
     return;
 }
 HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode){
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+  // if(hcan->Instance==CAN1)
+  // {
+    /* Peripheral clock enable */
+    __HAL_RCC_CAN1_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /**CAN1 GPIO Configuration
+    PB8     ------> CAN1_RX
+    PB9     ------> CAN1_TX
+    */
+    
+    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
+  
 
   return HAL_CAN_Init(&hcan);
 
@@ -127,4 +142,41 @@ void SimpleCan::RxHandler::notify(CAN_HandleTypeDef *hcan1)
     SimpleCan::_rxHandler->notify(hcan1);
 }
 
+// void CAN1_RX0_IRQHandler(void)
+// {
+//   HAL_CAN_IRQHandler(&SimpleCan::hcan);
+// }
+
+// void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan)
+// {
+//   GPIO_InitTypeDef GPIO_InitStruct = {0};
+//   if(hcan->Instance==CAN1)
+//   {
+//     /* Peripheral clock enable */
+//     __HAL_RCC_CAN1_CLK_ENABLE();
+//     __HAL_RCC_GPIOB_CLK_ENABLE();
+//     /**CAN1 GPIO Configuration
+//     PB8     ------> CAN1_RX
+//     PB9     ------> CAN1_TX
+//     */
+//     GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+//     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+//     GPIO_InitStruct.Pull = GPIO_NOPULL;
+//     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+//     GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
+//     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+//     HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
+//     HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
+//   }
+// }
+
+// void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+//   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
+// //   Serial.println(".");
+//   CAN_RxHeaderTypeDef RxHeader;
+//   uint8_t RxData[8]  = {0};
+//   HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData);
+//   // Serial.println(RxData);
+// }
 

@@ -7,10 +7,11 @@ static void handleCanMessage(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData)
 {
   Serial.println("message received");
 }
-
 extern "C" void CAN1_RX0_IRQHandler(void); 
-extern "C" void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan);
+// extern "C" void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan);
 extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan);
+
+
 
 void CAN1_RX0_IRQHandler(void)
 {
@@ -19,26 +20,26 @@ void CAN1_RX0_IRQHandler(void)
 
 void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  if(hcan->Instance==CAN1)
-  {
-    /* Peripheral clock enable */
-    __HAL_RCC_CAN1_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    /**CAN1 GPIO Configuration
-    PB8     ------> CAN1_RX
-    PB9     ------> CAN1_TX
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  // GPIO_InitTypeDef GPIO_InitStruct = {0};
+  // if(hcan->Instance==CAN1)
+  // {
+  //   /* Peripheral clock enable */
+  //   __HAL_RCC_CAN1_CLK_ENABLE();
+  //   __HAL_RCC_GPIOB_CLK_ENABLE();
+  //   /**CAN1 GPIO Configuration
+  //   PB8     ------> CAN1_RX
+  //   PB9     ------> CAN1_TX
+  //   */
+  //   GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+  //   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  //   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  //   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  //   GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
+  //   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
-  }
+  //   HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
+  //   HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
+  // }
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
@@ -57,6 +58,9 @@ SimpleCan can;
 
 
 void setup() {
+
+
+  
 
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
