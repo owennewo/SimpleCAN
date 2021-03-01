@@ -58,16 +58,18 @@ public:
 	HAL_StatusTypeDef init(CanSpeed speed, CanMode mode, int rx_pin, int tx_pin);
 	HAL_StatusTypeDef filter(CAN_FilterTypeDef *filter);
 	HAL_StatusTypeDef filterAcceptAll();
-	HAL_StatusTypeDef activateNotification();// RxHandler *rxHandler);
-	HAL_StatusTypeDef deactivateNotification();
+	HAL_StatusTypeDef subscribe(void (*_receive) (CanMessage * message) = nullptr);
+	HAL_StatusTypeDef unsubscribe();
 	HAL_StatusTypeDef begin();
 	HAL_StatusTypeDef stop();
 	HAL_StatusTypeDef send(CanMessage message);
 	// static CAN_HandleTypeDef hcan;
-	static void _receive(CanMessage message);
+	static void _receive(CanMessage* message);
+	static void(*receiveCallback)(CanMessage* message);
 private: 
 	CAN_HandleTypeDef* hcan;
-	static void(receiveCallback)(CanMessage message);
+	
 
+  
 };
 #endif

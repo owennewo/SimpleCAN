@@ -32,15 +32,9 @@ CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
   message.isRTR = false;
   message.isStandard = true;
   // uint8_t messageLoadBuffer[8] ={0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x23};
-  memcpy(message.data, data, 8);
+  memcpy(message.data, data, size);
   
   return message;
-}
-
-void(*receiveCallback)(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData);
-
-void attachReceiveCallback(void(*_receiveCallback)(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData)) {
-    receiveCallback = _receiveCallback;
 }
 
 void CAN1_RX0_IRQHandler(void)
@@ -48,14 +42,21 @@ void CAN1_RX0_IRQHandler(void)
   HAL_CAN_IRQHandler(&hcan);
 }
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-  CAN_RxHeaderTypeDef RxHeader;
-  uint8_t RxData[8]  = {0};
-  HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData);
-    Serial.print("message received: "); Serial.println(RxHeader.StdId);
-    Serial.print("message received: "); Serial.println(RxData[0]);
-  digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
+CanMessage rxMessage;
+uint8_t rxData[8]  = {0};
+CAN_RxHeaderTypeDef rxHeader;
 
-  // receiveCallback(RxHeader, RxData);
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+  
+  HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData);
+
+  rxMessage.dlc = rxHeader.DLC;
+  rxMessage.msgID = rxHeader.IDE == CAN_ID_STD ? rxHeader.StdId : rxHeader.ExtId;
+  rxMessage.isRTR = rxHeader.RTR;
+  rxMessage.isStandard = rxHeader.IDE == CAN_ID_STD ? true : false;
+
+  memcpy(rxMessage.data, rxData, rxHeader.DLC);
+
+  SimpleCan::_receive(&rxMessage);  
 
 }

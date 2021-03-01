@@ -1,15 +1,12 @@
 #include "SimpleCAN.h"
 #include <Arduino.h>
 
-void messageCallback(CAN_HandleTypeDef *CanHandle) {
-    Serial.println("message");
-    digitalWrite(PC5, !digitalRead(PC5));
-}
+void(*SimpleCan::receiveCallback)(CanMessage* message);
 
 SimpleCan::SimpleCan(CAN_HandleTypeDef* _hcan){
-
     hcan = _hcan;
 }
+
 HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode, int rx_pin, int tx_pin){
 
     // Much of this function is equivalent to HAL_CAN_MspInit but dynamic using PinMap
@@ -38,7 +35,6 @@ HAL_StatusTypeDef SimpleCan::begin(){
 }
 HAL_StatusTypeDef SimpleCan::stop(){
    	return HAL_CAN_Stop(hcan);
-
 }
 
 HAL_StatusTypeDef SimpleCan::filterAcceptAll(){
@@ -61,15 +57,22 @@ HAL_StatusTypeDef SimpleCan::send(CanMessage message){
     return HAL_CAN_AddTxMessage(hcan, &TxHeader, message.data, &TxMailbox);    
 }
 
-HAL_StatusTypeDef SimpleCan::activateNotification()
+HAL_StatusTypeDef SimpleCan::subscribe(void (*_receive) (CanMessage *message))
 {
-
+    receiveCallback = _receive;
 	return HAL_CAN_ActivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
 
 }
 
-HAL_StatusTypeDef SimpleCan::deactivateNotification(){
-   // _rxHandler = NULL;
+HAL_StatusTypeDef SimpleCan::unsubscribe(){
     return HAL_CAN_DeactivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
 }
 
+void SimpleCan::_receive(CanMessage* message) {
+  if (SimpleCan::receiveCallback != nullptr) {
+    SimpleCan::receiveCallback(message);
+  } else {
+    Serial.println("skipping");
+  }
+
+}
