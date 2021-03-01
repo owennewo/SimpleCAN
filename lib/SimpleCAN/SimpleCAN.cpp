@@ -1,7 +1,6 @@
 #include "SimpleCAN.h"
 #include <Arduino.h>
 
-
 SimpleCan::RxHandler* SimpleCan::_rxHandler = NULL;
 
 CAN_HandleTypeDef SimpleCan::hcan = {
@@ -43,29 +42,22 @@ SimpleCan::SimpleCan(){
 }
 HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode, int rx_pin, int tx_pin){
 
-    // GPIO_InitTypeDef GPIO_InitStruct = {0};
-  // if(hcan->Instance==CAN1)
-  // {
-    /* Peripheral clock enable */
-    __HAL_RCC_CAN1_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    /**CAN1 GPIO Configuration
-    PB8     ------> CAN1_RX
-    PB9     ------> CAN1_TX
-    */
-
-   GPIO_TypeDef* port = digitalPinToPort(rx_pin);
-    
+    // Much of this function is equivalent to HAL_CAN_MspInit but dynamic using PinMap
     PinName rx_name = digitalPinToPinName(rx_pin);
     PinName tx_name = digitalPinToPinName(tx_pin);
 
+    // these pin_functions enabe port clock and set correct alternative functions/speed
     pin_function( rx_name ,pinmap_function(rx_name, PinMap_CAN_RD));
     pin_function( tx_name, pinmap_function(tx_name, PinMap_CAN_TD));
     
-
-    HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
-  
+    if (hcan.Instance == CAN1) {
+        __HAL_RCC_CAN1_CLK_ENABLE();
+        HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
+        // HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
+    } else if (hcan.Instance == CAN2) {
+        __HAL_RCC_CAN2_CLK_ENABLE();
+        HAL_NVIC_EnableIRQ(CAN2_RX0_IRQn);
+    }
 
   return HAL_CAN_Init(&hcan);
 
@@ -110,13 +102,12 @@ HAL_StatusTypeDef SimpleCan::activateNotification( RxHandler *rxHandler)
 		return HAL_ERROR;
 	}
 
-
     HAL_NVIC_SetPriority(CAN1_RX1_IRQn, 0, 1);
     HAL_NVIC_EnableIRQ(CAN1_RX1_IRQn);
 
 	_rxHandler = rxHandler;
 	return HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
-    // return HAL_OK;
+
 }
 
 HAL_StatusTypeDef SimpleCan::deactivateNotification(){
