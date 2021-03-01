@@ -64,9 +64,10 @@ public:
 	HAL_StatusTypeDef stop();
 	HAL_StatusTypeDef send(CanMessage message);
 	// static CAN_HandleTypeDef hcan;
+	static void _receive(CanMessage message);
 private: 
 	CAN_HandleTypeDef* hcan;
-	
+	static void(receiveCallback)(CanMessage message);
 
 };
 #endif

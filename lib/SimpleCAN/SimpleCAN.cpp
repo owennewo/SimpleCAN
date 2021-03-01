@@ -1,40 +1,9 @@
 #include "SimpleCAN.h"
 #include <Arduino.h>
 
-// SimpleCan::RxHandler* SimpleCan::_rxHandler = NULL;
-
-// CAN_HandleTypeDef SimpleCan::hcan = {
-//   .Instance = CAN1,
-//   .Init = {
-//         .Prescaler = 21,
-//         .Mode = CAN_MODE_NORMAL,
-//         .SyncJumpWidth = CAN_SJW_1TQ,
-//         .TimeSeg1 = CAN_BS1_12TQ,
-//         .TimeSeg2 = CAN_BS2_4TQ,
-//         .TimeTriggeredMode = DISABLE,
-//         .AutoBusOff = DISABLE,
-//         .AutoWakeUp = DISABLE,
-//         .AutoRetransmission = DISABLE,
-//         .ReceiveFifoLocked = DISABLE,
-//         .TransmitFifoPriority = DISABLE,
-//   }
-// };
-
 void messageCallback(CAN_HandleTypeDef *CanHandle) {
     Serial.println("message");
     digitalWrite(PC5, !digitalRead(PC5));
-}
-
-CanMessage createMessage(){
-  CanMessage message;
-  message.dlc = 8;
-  message.msgID = 0x244;
-  message.isRTR = false;
-  message.isStandard = true;
-  uint8_t messageLoadBuffer[8] ={0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x23};
-  memcpy(message.data, messageLoadBuffer, 8);
-  
-  return message;
 }
 
 SimpleCan::SimpleCan(CAN_HandleTypeDef* _hcan){
@@ -82,18 +51,14 @@ HAL_StatusTypeDef SimpleCan::filter(CAN_FilterTypeDef *filterDef){
 
 HAL_StatusTypeDef SimpleCan::send(CanMessage message){
 	
-    // char msg[50];
     CAN_TxHeaderTypeDef TxHeader;
-    static uint8_t data = 0;
-    data++;
-    // // uint8_t data[5] = {'H','E','L','L','O'};
     uint32_t TxMailbox;
-    TxHeader.DLC = 5;
-    TxHeader.StdId = 0x244;
+    TxHeader.DLC = message.dlc;
+    TxHeader.StdId = message.msgID;
     TxHeader.IDE = CAN_ID_STD;
     TxHeader.RTR = CAN_RTR_DATA;
 
-    return HAL_CAN_AddTxMessage(hcan, &TxHeader, &data, &TxMailbox);    
+    return HAL_CAN_AddTxMessage(hcan, &TxHeader, message.data, &TxMailbox);    
 }
 
 HAL_StatusTypeDef SimpleCan::activateNotification()

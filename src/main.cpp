@@ -3,11 +3,12 @@
 #include <Arduino.h>
 #include "board_variant.h"
 #include <SimpleCAN.h>
-#include "hal_can_include.h"
+#include "can_helper.h"
 
 void handleCanMessage(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData)
 {
-  Serial.print("message received: "); Serial.println(rxData[0]);
+  Serial.print("message can received: "); Serial.println(rxHeader.StdId);
+  // Serial.print("message received: "); Serial.println(rxData[0]);
   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
 
 }
@@ -40,7 +41,9 @@ void loop() {
   
   Serial.println("Hola Can !!!");
   //digitalToggle(PC13);
-  CanMessage  msg = createMessage();
+  static uint8_t data[2];
+  data[0] = data[0]+2;
+  CanMessage  msg = createStandardMessage(0x244, data, 2);
   Serial.println("Send");
   
   can.send(msg);

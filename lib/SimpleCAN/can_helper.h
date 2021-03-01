@@ -11,6 +11,7 @@ static CAN_HandleTypeDef hcan = {
   .Instance = CAN1,
   .Init = {
         .Prescaler = 21,
+        // .Mode = CAN_MODE_LOOPBACK, // CAN_MODE_NORMAL,
         .Mode = CAN_MODE_NORMAL,
         .SyncJumpWidth = CAN_SJW_1TQ,
         .TimeSeg1 = CAN_BS1_12TQ,
@@ -23,6 +24,18 @@ static CAN_HandleTypeDef hcan = {
         .TransmitFifoPriority = DISABLE,
   }
 };
+
+CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
+  CanMessage message;
+  message.dlc = size;
+  message.msgID = id;
+  message.isRTR = false;
+  message.isStandard = true;
+  // uint8_t messageLoadBuffer[8] ={0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x23};
+  memcpy(message.data, data, 8);
+  
+  return message;
+}
 
 void(*receiveCallback)(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData);
 
@@ -39,6 +52,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
   CAN_RxHeaderTypeDef RxHeader;
   uint8_t RxData[8]  = {0};
   HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData);
+    Serial.print("message received: "); Serial.println(RxHeader.StdId);
     Serial.print("message received: "); Serial.println(RxData[0]);
   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
 
