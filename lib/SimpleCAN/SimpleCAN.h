@@ -36,7 +36,7 @@ typedef struct{
   bool isRTR;
   bool isStandard;
   uint8_t data[8];
-}CanMessage;
+} CanMessage;
 
 static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
     .FilterMaskIdHigh = 0,

@@ -61,7 +61,6 @@ HAL_StatusTypeDef SimpleCan::subscribe(void (*_receive) (CanMessage *message))
 {
     receiveCallback = _receive;
 	return HAL_CAN_ActivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
-
 }
 
 HAL_StatusTypeDef SimpleCan::unsubscribe(){
@@ -71,8 +70,5 @@ HAL_StatusTypeDef SimpleCan::unsubscribe(){
 void SimpleCan::_receive(CanMessage* message) {
   if (SimpleCan::receiveCallback != nullptr) {
     SimpleCan::receiveCallback(message);
-  } else {
-    Serial.println("skipping");
   }
-
 }

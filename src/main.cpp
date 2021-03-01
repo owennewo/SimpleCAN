@@ -7,12 +7,11 @@
 
 void handleCanMessage(CanMessage *message)
 {
-  Serial.print("message can received!: "); Serial.println(message->msgID);
-  // Serial.print("message received: "); Serial.println(rxData[0]);
+  Serial.print("message can received!: "); Serial.println(message->data[0]);
   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
 }
-
-SimpleCan can(&hcan);
+CAN_HandleTypeDef* hcan = createCanHandle();
+SimpleCan can = SimpleCan(hcan);
 
 void setup() {
   
@@ -24,7 +23,7 @@ void setup() {
   Serial.println("Setup");
 
   pinMode(PC13,OUTPUT);
-  can.init(Kbit250,CanMode::LoopBackCan, CAN_RX, CAN_TX);
+  can.init(Kbit250, CanMode::LoopBackCan, CAN_RX, CAN_TX);
 
   can.filterAcceptAll();
   can.subscribe(&handleCanMessage);
@@ -36,7 +35,9 @@ void loop() {
   digitalWrite(LED_RED, !digitalRead(LED_RED));
   
   static uint8_t data[2];
-  data[0] = data[0]+2;
+  data[0]++;
+  data[0]++;
+  
   CanMessage  msg = createStandardMessage(0x244, data, 2);
   Serial.println("Send");
   
