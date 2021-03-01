@@ -2,6 +2,7 @@
 #include "board_variant.h"
 #include "stm32f4xx_hal_can.h"
 #include <SimpleCAN.h>
+#include <Wire.h>
 
 static void handleCanMessage(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData)
 {
@@ -49,6 +50,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
   uint8_t RxData[8]  = {0};
   HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData);
   // Serial.println(RxData);
+  
 }
 
 SimpleCan::RxHandler can1RxHandler(8, handleCanMessage);
@@ -59,7 +61,7 @@ SimpleCan can;
 
 void setup() {
 
-
+  Wire.begin(115200);
   
 
   pinMode(LED_GREEN, OUTPUT);
@@ -70,7 +72,7 @@ void setup() {
   Serial.println("Setup");
 
   pinMode(PC13,OUTPUT);
-  can.init(Kbit250,CanMode::LoopBackCan);
+  can.init(Kbit250,CanMode::LoopBackCan, CAN_RX, CAN_TX);
 
   can.filterAcceptAll();
   can.activateNotification(&can1RxHandler);

@@ -68,7 +68,7 @@ public:
 	};
 
 	SimpleCan();
-	HAL_StatusTypeDef init(CanSpeed speed, CanMode mode);
+	HAL_StatusTypeDef init(CanSpeed speed, CanMode mode, int rx_pin, int tx_pin);
 	HAL_StatusTypeDef filter(CAN_FilterTypeDef *filter);
 	HAL_StatusTypeDef filterAcceptAll();
 //   HAL_StatusTypeDef configSnifferFilter();

@@ -41,9 +41,9 @@ CanMessage createMessage(){
 SimpleCan::SimpleCan(){
     return;
 }
-HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode){
+HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode, int rx_pin, int tx_pin){
 
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    // GPIO_InitTypeDef GPIO_InitStruct = {0};
   // if(hcan->Instance==CAN1)
   // {
     /* Peripheral clock enable */
@@ -53,13 +53,15 @@ HAL_StatusTypeDef SimpleCan::init(CanSpeed speed, CanMode mode){
     PB8     ------> CAN1_RX
     PB9     ------> CAN1_TX
     */
+
+   GPIO_TypeDef* port = digitalPinToPort(rx_pin);
     
-    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    PinName rx_name = digitalPinToPinName(rx_pin);
+    PinName tx_name = digitalPinToPinName(tx_pin);
+
+    pin_function( rx_name ,pinmap_function(rx_name, PinMap_CAN_RD));
+    pin_function( tx_name, pinmap_function(tx_name, PinMap_CAN_TD));
+    
 
     HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
