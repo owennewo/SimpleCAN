@@ -3,6 +3,7 @@
 
 #include "Arduino.h"
 #include "stm32f4xx_hal_can.h"
+// #include "hal_can_include.h"
 // #include "example_can.h"
 
 
@@ -48,38 +49,24 @@ static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
 
 
 CanMessage createMessage(void);
-/**
- CAN wrapper for STM32F405RGT6 board.
-*/
+
 class SimpleCan
 {
 public:
-	class RxHandler
-	{
-	public:
-		RxHandler(uint16_t dataLength, void(*callback)(CAN_RxHeaderTypeDef rxHeader, uint8_t *rxData));
-		~RxHandler();
-		void notify(CAN_HandleTypeDef *hcan1);
-	
-  private:
-		CAN_RxHeaderTypeDef _rxHeader;
-		uint8_t *_rxData;
-		void(*_callback)(CAN_RxHeaderTypeDef, uint8_t *);
-	};
 
-	SimpleCan();
+	SimpleCan(CAN_HandleTypeDef* hcan);
 	HAL_StatusTypeDef init(CanSpeed speed, CanMode mode, int rx_pin, int tx_pin);
 	HAL_StatusTypeDef filter(CAN_FilterTypeDef *filter);
 	HAL_StatusTypeDef filterAcceptAll();
-//   HAL_StatusTypeDef configSnifferFilter();
-	HAL_StatusTypeDef activateNotification(RxHandler *rxHandler);
+	HAL_StatusTypeDef activateNotification();// RxHandler *rxHandler);
 	HAL_StatusTypeDef deactivateNotification();
 	HAL_StatusTypeDef begin();
 	HAL_StatusTypeDef stop();
 	HAL_StatusTypeDef send(CanMessage message);
-  //private: interrupt handler needs access to it
-  static CAN_HandleTypeDef hcan;
-  static RxHandler *_rxHandler;
+	// static CAN_HandleTypeDef hcan;
+private: 
+	CAN_HandleTypeDef* hcan;
+	
 
 };
 #endif
