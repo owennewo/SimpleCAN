@@ -4,7 +4,7 @@ This is a wrapper for using CAN bus on stm32f4XX chips (tested on stm32f405) but
 
 You can transmit and receive CAN message.  For receive it is possible to poll (i.e. call can.receive in loop()) or use interrupts which require can.subscribe(callback). 
 
-For
+At a future date I might try to take some FDCAN code (for stm32H7 or G4 series) I have and sit it behind the same API.  i.e. it would share the same interface.
 
 Perhaps the most brittle part of this library is that it assumes your board has a 
 42MHz PCKL1 which is common for 168Mhz Boards such as stm32f4xx
