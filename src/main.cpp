@@ -2,14 +2,13 @@
 #include "board_variant.h"
 #include <SimpleCAN.h>
 #include "can_helper.h"
-#include "can_weak.h"
 
 void handleCanMessage(CanMessage *message)
 {
   Serial.print("message can received!: "); Serial.println(message->data[0]);
   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
 }
-// CAN_HandleTypeDef* hcan = createCanHandle();
+
 SimpleCAN can;
 
 void setup() {

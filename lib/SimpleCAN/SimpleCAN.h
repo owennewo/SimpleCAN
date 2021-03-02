@@ -2,9 +2,6 @@
 
 #include "Arduino.h"
 #include "stm32f4xx_hal_can.h"
-// #include "hal_can_include.h"
-// #include "example_can.h"
-
 
 
 // Value needed for prescaler. depends 

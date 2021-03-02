@@ -5,7 +5,6 @@
 #include "SimpleCAN.h"
 
 extern "C" void CAN1_RX0_IRQHandler(void); 
-// extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan);
 
 CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
   CanMessage message;
@@ -13,7 +12,6 @@ CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
   message.msgID = id;
   message.isRTR = false;
   message.isStandard = true;
-  // uint8_t messageLoadBuffer[8] ={0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x23};
   memcpy(message.data, data, size);
   
   return message;
@@ -44,5 +42,3 @@ void CAN1_RX0_IRQHandler(void)
 {
   HAL_CAN_IRQHandler(SimpleCAN::_hcan);
 }
-
-

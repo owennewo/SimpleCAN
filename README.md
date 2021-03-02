@@ -1,6 +1,6 @@
-# SimpleCAN
+# SimpleCAN (for STM32DUINO)
 
-This is a wrapper for using CAN bus on stm32f4XX chips (tested on stm32f405) but as it uses HAL_CAN it may work on other stm32 chips.
+This is a wrapper for using CAN bus on stm32f4XX chips (tested on stm32f405) but as it uses HAL_CAN it may work on other stm32 chips.  It is meant for Arduino framework.
 
 You can transmit and receive CAN message.  For receive it is possible to poll (i.e. call can.receive in loop()) or use interrupts which require can.subscribe(callback). 
 
