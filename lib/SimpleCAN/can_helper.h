@@ -5,49 +5,7 @@
 #include "SimpleCAN.h"
 
 extern "C" void CAN1_RX0_IRQHandler(void); 
-extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan);
-
-CAN_HandleTypeDef* hcan_cached;
-// = {
-//   .Instance = CAN1,
-//   .Init = {
-//         .Prescaler = 21,
-//         .Mode = CAN_MODE_LOOPBACK, // CAN_MODE_NORMAL,
-//         // .Mode = CAN_MODE_NORMAL,
-//         .SyncJumpWidth = CAN_SJW_1TQ,
-//         .TimeSeg1 = CAN_BS1_12TQ,
-//         .TimeSeg2 = CAN_BS2_4TQ,
-//         .TimeTriggeredMode = DISABLE,
-//         .AutoBusOff = DISABLE,
-//         .AutoWakeUp = DISABLE,
-//         .AutoRetransmission = DISABLE,
-//         .ReceiveFifoLocked = DISABLE,
-//         .TransmitFifoPriority = DISABLE,
-//   }
-// };
-
-CAN_HandleTypeDef* createCanHandle() {
-  hcan_cached = new CAN_HandleTypeDef(
-    {
-      .Instance = CAN1,
-      .Init = {
-            .Prescaler = 21,
-            .Mode = CAN_MODE_LOOPBACK, // CAN_MODE_NORMAL,
-            // .Mode = CAN_MODE_NORMAL,
-            .SyncJumpWidth = CAN_SJW_1TQ,
-            .TimeSeg1 = CAN_BS1_12TQ,
-            .TimeSeg2 = CAN_BS2_4TQ,
-            .TimeTriggeredMode = DISABLE,
-            .AutoBusOff = DISABLE,
-            .AutoWakeUp = DISABLE,
-            .AutoRetransmission = DISABLE,
-            .ReceiveFifoLocked = DISABLE,
-            .TransmitFifoPriority = DISABLE,
-      }
-    }   
-  );
-  return hcan_cached;
-}
+// extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan);
 
 CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
   CanMessage message;
@@ -61,26 +19,30 @@ CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
   return message;
 }
 
+void printClockSpeed() {
+  
+  Serial.print("PCLK1: "); Serial.println(HAL_RCC_GetPCLK1Freq());
+  Serial.print("SysClock: "); Serial.println(HAL_RCC_GetSysClockFreq());
+
+}
+
+void printCanSpeed() {
+  CAN_InitTypeDef initType = SimpleCan::_hcan->Init;
+  uint32_t ts1 = (initType.TimeSeg1 >> CAN_BTR_TS1_Pos) +1;
+  uint32_t ts2 = (initType.TimeSeg2 >> CAN_BTR_TS2_Pos) +1;
+  
+  uint32_t bitrate = (HAL_RCC_GetPCLK1Freq() / initType.Prescaler) / (1 + ts1 + ts2);
+  
+  Serial.print("PCKL1: "); Serial.println(HAL_RCC_GetPCLK1Freq());
+  Serial.print("Prescaler: "); Serial.println(initType.Prescaler);
+  Serial.print("TS1: "); Serial.println(ts1);
+  Serial.print("TS2: "); Serial.println(ts2);
+  Serial.print("CAN bitrate: "); Serial.println(bitrate);
+}
+
 void CAN1_RX0_IRQHandler(void)
 {
-  HAL_CAN_IRQHandler(hcan_cached);
+  HAL_CAN_IRQHandler(SimpleCan::_hcan);
 }
 
-CanMessage rxMessage;
-uint8_t rxData[8]  = {0};
-CAN_RxHeaderTypeDef rxHeader;
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-  
-  HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData);
-
-  rxMessage.dlc = rxHeader.DLC;
-  rxMessage.msgID = rxHeader.IDE == CAN_ID_STD ? rxHeader.StdId : rxHeader.ExtId;
-  rxMessage.isRTR = rxHeader.RTR;
-  rxMessage.isStandard = rxHeader.IDE == CAN_ID_STD ? true : false;
-
-  memcpy(rxMessage.data, rxData, rxHeader.DLC);
-
-  SimpleCan::_receive(&rxMessage);  
-
-}
