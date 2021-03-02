@@ -27,7 +27,7 @@ void printClockSpeed() {
 }
 
 void printCanSpeed() {
-  CAN_InitTypeDef initType = SimpleCan::_hcan->Init;
+  CAN_InitTypeDef initType = SimpleCAN::_hcan->Init;
   uint32_t ts1 = (initType.TimeSeg1 >> CAN_BTR_TS1_Pos) +1;
   uint32_t ts2 = (initType.TimeSeg2 >> CAN_BTR_TS2_Pos) +1;
   
@@ -42,7 +42,7 @@ void printCanSpeed() {
 
 void CAN1_RX0_IRQHandler(void)
 {
-  HAL_CAN_IRQHandler(SimpleCan::_hcan);
+  HAL_CAN_IRQHandler(SimpleCAN::_hcan);
 }
 
 

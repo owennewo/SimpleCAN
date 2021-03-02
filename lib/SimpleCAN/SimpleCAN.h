@@ -74,11 +74,11 @@ static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
 
 CanMessage createMessage(void);
 
-class SimpleCan
+class SimpleCAN
 {
 public:
 
-	SimpleCan();
+	SimpleCAN();
 	CAN_Status init(int rx_pin, int tx_pin, CanSpeed speed = BAUD_500K, CanMode mode = NormalCAN);
 	CAN_Status filter(CAN_FilterTypeDef *filter);
 	CAN_Status filterAcceptAll();

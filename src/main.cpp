@@ -1,5 +1,3 @@
-#define USE_HAL_CAN_REGISTER_CALLBACKS 1
-
 #include <Arduino.h>
 #include "board_variant.h"
 #include <SimpleCAN.h>
@@ -12,7 +10,7 @@ void handleCanMessage(CanMessage *message)
   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
 }
 // CAN_HandleTypeDef* hcan = createCanHandle();
-SimpleCan can;
+SimpleCAN can;
 
 void setup() {
   
