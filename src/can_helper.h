@@ -6,10 +6,10 @@
 
 extern "C" void CAN1_RX0_IRQHandler(void); 
 
-CanMessage createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
-  CanMessage message;
+can_message_t createStandardMessage(uint32_t id, uint8_t data[],uint8_t size){
+  can_message_t message;
   message.dlc = size;
-  message.msgID = id;
+  message.id = id;
   message.isRTR = false;
   message.isStandard = true;
   memcpy(message.data, data, size);

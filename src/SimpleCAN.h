@@ -53,11 +53,11 @@ typedef enum
 
 typedef struct{
   uint8_t dlc;
-  uint32_t msgID;
+  uint32_t id;
   bool isRTR;
   bool isStandard;
   uint8_t data[8];
-} CanMessage;
+} can_message_t;
 
 static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
     .FilterMaskIdHigh = 0,
@@ -68,9 +68,6 @@ static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
     .FilterActivation = ENABLE,
 };
 
-
-CanMessage createMessage(void);
-
 class SimpleCAN
 {
 public:
@@ -79,14 +76,14 @@ public:
 	CAN_Status init(int rx_pin, int tx_pin, CanSpeed speed = BAUD_500K, CanMode mode = NormalCAN);
 	CAN_Status filter(CAN_FilterTypeDef *filter);
 	CAN_Status filterAcceptAll();
-	CAN_Status subscribe(void (*_receive) (CanMessage * message) = nullptr);
+	CAN_Status subscribe(void (*_receive) (can_message_t * message) = nullptr);
 	CAN_Status unsubscribe();
 	CAN_Status begin();
 	CAN_Status stop();
-	CAN_Status transmit(CanMessage* txMessage);
-	CAN_Status receive(CanMessage* rxMessage);
-	static void _receive(CanMessage* rxMessage);
-	static void(*receiveCallback)(CanMessage* rxMessage);
+	CAN_Status transmit(can_message_t* txMessage);
+	CAN_Status receive(can_message_t* rxMessage);
+	static void _receive(can_message_t* rxMessage);
+	static void(*receiveCallback)(can_message_t* rxMessage);
 	static CAN_HandleTypeDef* _hcan;
 private: 
 	void createCanHandle(CanSpeed speed, CanMode mode);

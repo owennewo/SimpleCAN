@@ -1,9 +1,8 @@
 #include "SimpleCAN.h"
 #include <Arduino.h>
 
-#define can_mode(mode) (mode == )
 
-void(*SimpleCAN::receiveCallback)(CanMessage* message);
+void(*SimpleCAN::receiveCallback)(can_message_t* message);
 CAN_HandleTypeDef* SimpleCAN::_hcan;
 
 SimpleCAN::SimpleCAN(){
@@ -77,19 +76,19 @@ CAN_Status SimpleCAN::filter(CAN_FilterTypeDef *filterDef){
   return static_cast<CAN_Status>(HAL_CAN_ConfigFilter(_hcan, filterDef));
 }
 
-CAN_Status SimpleCAN::transmit(CanMessage * message){
+CAN_Status SimpleCAN::transmit(can_message_t * message){
 	
     CAN_TxHeaderTypeDef TxHeader;
     uint32_t TxMailbox;
     TxHeader.DLC = message->dlc;
-    TxHeader.StdId = message->msgID;
+    TxHeader.StdId = message->id;
     TxHeader.IDE = CAN_ID_STD;
     TxHeader.RTR = CAN_RTR_DATA;
 
     return static_cast<CAN_Status>(HAL_CAN_AddTxMessage(_hcan, &TxHeader, message->data, &TxMailbox)); 
 }
 
-CAN_Status SimpleCAN::receive(CanMessage * rxMessage) {
+CAN_Status SimpleCAN::receive(can_message_t * rxMessage) {
 
   static uint8_t rxData[8]  = {0};
   static CAN_RxHeaderTypeDef rxHeader;
@@ -98,7 +97,7 @@ CAN_Status SimpleCAN::receive(CanMessage * rxMessage) {
 
   if (status == CAN_OK) {
     rxMessage->dlc = rxHeader.DLC;
-    rxMessage->msgID = rxHeader.IDE == CAN_ID_STD ? rxHeader.StdId : rxHeader.ExtId;
+    rxMessage->id = rxHeader.IDE == CAN_ID_STD ? rxHeader.StdId : rxHeader.ExtId;
     rxMessage->isRTR = rxHeader.RTR;
     rxMessage->isStandard = rxHeader.IDE == CAN_ID_STD ? true : false;
 
@@ -107,7 +106,7 @@ CAN_Status SimpleCAN::receive(CanMessage * rxMessage) {
   return status;
 }
 
-CAN_Status SimpleCAN::subscribe(void (*_receive) (CanMessage *message))
+CAN_Status SimpleCAN::subscribe(void (*_receive) (can_message_t *message))
 {
     receiveCallback = _receive;
 	return static_cast<CAN_Status>(HAL_CAN_ActivateNotification(_hcan, CAN_IT_RX_FIFO0_MSG_PENDING));
@@ -117,7 +116,7 @@ CAN_Status SimpleCAN::unsubscribe(){
     return static_cast<CAN_Status>(HAL_CAN_DeactivateNotification(_hcan, CAN_IT_RX_FIFO0_MSG_PENDING));
 }
 
-void SimpleCAN::_receive(CanMessage* message) {
+void SimpleCAN::_receive(can_message_t* message) {
   if (SimpleCAN::receiveCallback != nullptr) {
     SimpleCAN::receiveCallback(message);
   }
@@ -127,14 +126,14 @@ void SimpleCAN::_receive(CanMessage* message) {
 
 extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
-  static CanMessage rxMessage;
+  static can_message_t rxMessage;
   static uint8_t rxData[8]  = {0};
   static CAN_RxHeaderTypeDef rxHeader;
 
   HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData);
 
   rxMessage.dlc = rxHeader.DLC;
-  rxMessage.msgID = rxHeader.IDE == CAN_ID_STD ? rxHeader.StdId : rxHeader.ExtId;
+  rxMessage.id = rxHeader.IDE == CAN_ID_STD ? rxHeader.StdId : rxHeader.ExtId;
   rxMessage.isRTR = rxHeader.RTR;
   rxMessage.isStandard = rxHeader.IDE == CAN_ID_STD ? true : false;
 

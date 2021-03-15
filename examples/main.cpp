@@ -3,7 +3,7 @@
 #include <SimpleCAN.h>
 #include "can_helper.h"
 
-void handleCanMessage(CanMessage *message)
+void handleCanMessage(can_message_t *message)
 {
   Serial.print("message can received!: "); Serial.println(message->data[0]);
   digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
@@ -33,7 +33,7 @@ void setup() {
 
 void poll() {
   delay(100);
-  static CanMessage message = {};
+  static can_message_t message = {};
   if (can.receive(&message)==CAN_OK) {
     Serial.print(message.data[0]);
   } else {
@@ -49,7 +49,7 @@ void transmit() {
   data[0]++;
   data[0]++;
   
-  CanMessage msg = createStandardMessage(0x244, data, 2);
+  can_message_t msg = createStandardMessage(0x244, data, 2);
   Serial.println("Send");
   
   can.transmit(&msg);
