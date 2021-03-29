@@ -36,8 +36,8 @@ const can_timings[] {
 enum CanMode
 {
 	NormalCAN = CAN_MODE_NORMAL,
-	// SilentCAN = CAN_MODE_SILENT,
 	LoopBackCan = CAN_MODE_LOOPBACK,
+	// SilentCAN = CAN_MODE_SILENT,
 	// SilentLoopBackCAN = CAN_MODE_SILENT_LOOPBACK
 };
 
