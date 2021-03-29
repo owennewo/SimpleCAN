@@ -3,7 +3,6 @@
 #include "Arduino.h"
 #include "stm32f4xx_hal_can.h"
 
-
 // Value needed for prescaler. depends 
 // on CLK configuration
 enum CanSpeed
