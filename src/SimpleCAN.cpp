@@ -1,8 +1,9 @@
 #include "SimpleCAN.h"
 #include <Arduino.h>
+#include <SimpleCAN_c.h>
 
-
-void(*SimpleCAN::receiveCallback)(can_message_t* message);
+can_callback_function_t SimpleCAN::receiveFunction;
+// void(*SimpleCAN::receiveCallback)(can_message_t* message);
 CAN_HandleTypeDef* SimpleCAN::_hcan;
 
 SimpleCAN::SimpleCAN(){
@@ -106,19 +107,25 @@ CAN_Status SimpleCAN::receive(can_message_t * rxMessage) {
   return status;
 }
 
-CAN_Status SimpleCAN::subscribe(void (*_receive) (can_message_t *message))
+CAN_Status SimpleCAN::subscribe(can_callback_function_t function)
 {
-    receiveCallback = _receive;
+  receiveFunction = function;
 	return static_cast<CAN_Status>(HAL_CAN_ActivateNotification(_hcan, CAN_IT_RX_FIFO0_MSG_PENDING));
 }
+
+// CAN_Status SimpleCAN::subscribe2(void (*_receive) (can_message_t *message))
+// {
+//   receiveCallback = _receive;
+// 	return static_cast<CAN_Status>(HAL_CAN_ActivateNotification(_hcan, CAN_IT_RX_FIFO0_MSG_PENDING));
+// }
 
 CAN_Status SimpleCAN::unsubscribe(){
     return static_cast<CAN_Status>(HAL_CAN_DeactivateNotification(_hcan, CAN_IT_RX_FIFO0_MSG_PENDING));
 }
 
 void SimpleCAN::_receive(can_message_t* message) {
-  if (SimpleCAN::receiveCallback != nullptr) {
-    SimpleCAN::receiveCallback(message);
+  if (SimpleCAN::receiveFunction != nullptr) {
+    SimpleCAN::receiveFunction(message);
   }
 }
 

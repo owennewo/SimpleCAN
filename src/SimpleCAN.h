@@ -58,6 +58,8 @@ typedef struct{
   uint8_t data[8];
 } can_message_t;
 
+typedef std::function<void(can_message_t*)> can_callback_function_t;
+
 static CAN_FilterTypeDef FILTER_ACCEPT_ALL = {
     .FilterMaskIdHigh = 0,
     .FilterMaskIdLow = 0,
@@ -75,14 +77,17 @@ public:
 	CAN_Status init(int rx_pin, int tx_pin, CanSpeed speed = BAUD_500K, CanMode mode = NormalCAN);
 	CAN_Status filter(CAN_FilterTypeDef *filter);
 	CAN_Status filterAcceptAll();
-	CAN_Status subscribe(void (*_receive) (can_message_t * message) = nullptr);
+	CAN_Status subscribe(can_callback_function_t function);
+	CAN_Status subscribe2(void (*_receive) (can_message_t * message) = nullptr);
 	CAN_Status unsubscribe();
 	CAN_Status begin();
 	CAN_Status stop();
 	CAN_Status transmit(can_message_t* txMessage);
 	CAN_Status receive(can_message_t* rxMessage);
 	static void _receive(can_message_t* rxMessage);
-	static void(*receiveCallback)(can_message_t* rxMessage);
+	//static void(*receiveCallback)(can_message_t* rxMessage);
+	static can_callback_function_t receiveFunction;
+	
 	static CAN_HandleTypeDef* _hcan;
 private: 
 	void createCanHandle(CanSpeed speed, CanMode mode);
