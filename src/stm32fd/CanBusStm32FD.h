@@ -1,28 +1,19 @@
 #pragma once
-
+#if defined(HAL_FDCAN_MODULE_ENABLED)
 #include "Arduino.h"
 #include "../CanBus.h"
+
+#if defined(STM32G4xx)
 #include <stm32g4xx_hal_fdcan.h>
+#elif defined(STM32H7xx)
+#include <stm32h7xx_hal_fdcan.h>
+#endif
 
 class CanBusStm32FD : public CanBus
 {
-public:
-	// class RxHandler
-	// {
-	// public:
-	// 	RxHandler(uint16_t dataLength, void (*callback)(RxFrame frame)); // FDCAN_RxHeaderTypeDef rxHeader, uint8_t *rxData));
-	// 	~RxHandler();
-
-	// 	void notify(FDCAN_HandleTypeDef *hfdcan);
-
-	// private:
-	// 	FDCAN_RxHeaderTypeDef _rxHeader;
-	// 	uint8_t *_rxData;
-	// 	void (*_callback)(RxFrame frame); // FDCAN_RxHeaderTypeDef, uint8_t *);
-	// };
 
 public:
-	CanBusStm32FD(uint32_t rxPin, uint32_t txPin, bool terminateTransceiver);
+	CanBusStm32FD(uint32_t rxPin, uint32_t txPin, uint32_t shdnPin = -1);
 
 	CanStatus begin(int bitrate = 1'000'000, CanMode mode = CAN_STANDARD) override;
 	CanStatus writeFrame(uint32_t identifier, uint32_t frameType, uint32_t dataLength, uint8_t data[]);
@@ -42,6 +33,7 @@ public:
 	int dlcToLength(uint32_t dlc);
 	static uint32_t _rxPin;
 	static uint32_t _txPin;
+	static uint32_t _shdnPin;
 	static void (*_callbackFunction)();
 
 private:
@@ -50,3 +42,4 @@ private:
 	FDCAN_RxHeaderTypeDef _rxHeader;
 	uint8_t *_rxData;
 };
+#endif

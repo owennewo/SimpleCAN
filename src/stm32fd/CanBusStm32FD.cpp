@@ -8,6 +8,7 @@ extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t 
 
 uint32_t CanBusStm32FD::_rxPin;
 uint32_t CanBusStm32FD::_txPin;
+uint32_t CanBusStm32FD::_shdnPin;
 
 CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode);
 void canBusPostInit(FDCAN_HandleTypeDef *hfdcan);
@@ -16,19 +17,21 @@ void (*CanBusStm32FD::_callbackFunction)() = nullptr;
 FDCAN_HandleTypeDef CanBusStm32FD::_hfdcan1 = {};
 // CanBusStm32FD::RxHandler *CanBusStm32FD::_rxHandler = NULL;
 
-CanBusStm32FD::CanBusStm32FD(uint32_t rxPin, uint32_t txPin, bool terminateTransceiver)
+CanBusStm32FD::CanBusStm32FD(uint32_t rxPin, uint32_t txPin, uint32_t shdnPin)
 {
 	if (_hfdcan1.Instance != NULL)
 	{
-		Error_Handler();
+		// Error_Handler();
 	}
 	CanBusStm32FD::_rxPin = rxPin;
 	CanBusStm32FD::_txPin = txPin;
+	CanBusStm32FD::_shdnPin = shdnPin;
 	_hfdcan1.Instance = FDCAN1;
 
-	pinMode(CAN_SHDN, OUTPUT);
-	// pinMode(CAN_TERM, OUTPUT);
-	// digitalWrite(CAN_TERM, terminateTransceiver ? HIGH : LOW);
+	if (shdnPin != -1)
+	{
+		pinMode(shdnPin, OUTPUT);
+	}
 }
 
 CanStatus CanBusStm32FD::begin(int bitrate, CanMode mode)
@@ -100,13 +103,19 @@ CanStatus CanBusStm32FD::writeRemoteFrame(int identifier, uint8_t length)
 
 CanStatus CanBusStm32FD::start(void)
 {
-	digitalWrite(CAN_SHDN, LOW);
+	if (CanBusStm32FD::_shdnPin != -1)
+	{
+		digitalWrite(CanBusStm32FD::_shdnPin, LOW);
+	}
 	return HAL_FDCAN_Start(&_hfdcan1) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
 CanStatus CanBusStm32FD::stop(void)
 {
-	digitalWrite(CAN_SHDN, HIGH);
+	if (CanBusStm32FD::_shdnPin != -1)
+	{
+		digitalWrite(CanBusStm32FD::_shdnPin, HIGH);
+	}
 	return HAL_FDCAN_Stop(&_hfdcan1) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
@@ -159,41 +168,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 		CanBusStm32FD::_callbackFunction();
 	}
 }
-
-// CanBusStm32FD::RxHandler::RxHandler(uint16_t dataLength, void (*callback)(RxFrame frame)) // FDCAN_RxHeaderTypeDef, uint8_t *))
-// {
-// 	_rxData = new byte[dataLength];
-// 	_callback = callback;
-// }
-
-// CanBusStm32FD::RxHandler::~RxHandler()
-// {
-// 	delete[] _rxData;
-// }
-
-// void CanBusStm32FD::RxHandler::notify(FDCAN_HandleTypeDef *hfdcan)
-// {
-// 	Serial.println("notify");
-// 	return;
-// 	// if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &_rxHeader, _rxData) != HAL_OK)
-// 	// {
-// 	// 	Serial.println("problem");
-// 	// 	Error_Handler();
-// 	// }
-// 	// Serial.println("after");
-
-// 	// RxFrame frame = {
-// 	// 	.identifier = _rxHeader.Identifier,
-// 	// 	.isRemoteRequest = _rxHeader.RxFrameType == FDCAN_REMOTE_FRAME,
-// 	// 	.dataLength = _rxHeader.DataLength,
-// 	// 	.buffer = new uint8_t[_rxHeader.DataLength]};
-// 	// memcpy(frame.buffer, _rxData, _rxHeader.DataLength);
-
-// 	// if (_callback != NULL)
-// 	// {
-// 	// 	_callback(frame); //_rxHeader, _rxData);
-// 	// }
-// }
 
 uint32_t CanBusStm32FD::available()
 {
@@ -304,10 +278,8 @@ uint32_t toMode(CanMode mode)
 WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode)
 {
 
-	uint32_t clockFreq = HAL_RCC_GetSysClockFreq(); // or SystemCoreClock;
-
-	int quotient = clockFreq / bitrate;
-	int remainder = clockFreq % bitrate;
+	uint32_t clockFreq = HAL_RCC_GetSysClockFreq();
+	// uint32_t clockFreq = HAL_RCC_GetPCLK1Freq();
 
 	// Looking for a timeQuanta of between 8 and 25.
 	// start at 16 and work outwards
@@ -359,8 +331,9 @@ WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode
 	int nominalTimeSeg2 = timeQuanta - nominalTimeSeg1 - 1;
 
 #ifdef CAN_DEBUG
-
-	Serial.print("bitrate:");
+	Serial.print("clockFreq:");
+	Serial.print(clockFreq);
+	Serial.print(", bitrate:");
 	Serial.print(bitrate);
 	Serial.print(", core:");
 	Serial.print(clockFreq);
@@ -378,8 +351,11 @@ WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode
 #endif
 
 	FDCAN_InitTypeDef *init = &(hfdcan->Init);
+#if defined(STM32G4xx)
+	// TODO: This is not availanle for H7, should we set another options?
+	init->ClockDivider = FDCAN_CLOCK_DIV1; //<- this is on G4 but not H7
+#endif
 
-	init->ClockDivider = FDCAN_CLOCK_DIV1;
 	init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster/longer FDCAN_FRAME_FD_BRS;
 	init->Mode = toMode(mode);				 // FDCAN_MODE_NORMAL;
 	// TODO: which of these do we want as default?
@@ -400,6 +376,11 @@ WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode
 	init->StdFiltersNbr = 1;
 	init->ExtFiltersNbr = 0;
 	init->TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+
+#if defined(STM32H7xx)
+	init->RxFifo0ElmtsNbr = 8;
+	init->TxFifoQueueElmtsNbr = 8;
+#endif
 
 	if (HAL_FDCAN_Init(hfdcan) != HAL_OK)
 	{
@@ -432,10 +413,18 @@ WEAK void canBusPostInit(FDCAN_HandleTypeDef *hfdcan)
 
 	// Initializes the peripherals clocks
 	periphClkInit.PeriphClockSelection |= RCC_PERIPHCLK_FDCAN;
+
+#if defined(STM32G4xx)
+	// TODO: This is not availanle for H7, should we set another options?
 	periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PCLK1;
+	// periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
+#elif defined(STM32H7xx)
+	periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
+
+#endif
 	if (HAL_RCCEx_PeriphCLKConfig(&periphClkInit) != HAL_OK)
 	{
-		Error_Handler();
+		// Error_Handler();
 	}
 
 	// Peripheral clock enable
