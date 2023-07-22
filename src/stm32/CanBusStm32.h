@@ -1,19 +1,17 @@
 #pragma once
-#if defined(HAL_FDCAN_MODULE_ENABLED)
+#if defined(HAL_CAN_MODULE_ENABLED)
 #include "Arduino.h"
 #include "../CanBus.h"
 
-#if defined(STM32G4xx)
-#include <stm32g4xx_hal_fdcan.h>
-#elif defined(STM32H7xx)
-#include <stm32h7xx_hal_fdcan.h>
+#if defined(STM32F4xx)
+#include "stm32f4xx_hal_can.h"
 #endif
 
-class CanBusStm32FD : public CanBus
+class CanBusStm32 : public CanBus
 {
 
 public:
-	CanBusStm32FD(uint32_t rxPin, uint32_t txPin, uint32_t shdnPin = -1);
+	CanBusStm32(uint32_t rxPin, uint32_t txPin, uint32_t shdnPin = -1);
 
 	CanStatus begin(uint32_t bitrate = 1'000'000, CanMode mode = CAN_STANDARD) override;
 	CanStatus writeFrame(uint32_t identifier, uint32_t frameType, uint32_t dataLength, uint8_t data[]);
@@ -29,19 +27,19 @@ public:
 	CanStatus start();
 	CanStatus stop();
 
-	static FDCAN_HandleTypeDef _hfdcan1;
+	static CAN_HandleTypeDef _hcan;
 
 	// todo make this private
-	uint32_t dlcToLength(uint32_t dlc);
+	// uint32_t dlcToLength(uint32_t dlc);
 	static uint32_t _rxPin;
 	static uint32_t _txPin;
 	static uint32_t _shdnPin;
 	static void (*_callbackFunction)();
 
 private:
-	WEAK void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
+	// WEAK void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
 	uint32_t lengthToDLC(uint32_t length);
-	FDCAN_RxHeaderTypeDef _rxHeader;
+	CAN_RxHeaderTypeDef _rxHeader;
 	uint8_t *_rxData;
 };
 #endif

@@ -29,17 +29,21 @@ class CanBus
 
 public:
     // these are overridden by the hardware specific implementations
-    virtual CanStatus begin(int bitrate = 1'000'000, CanMode mode = CAN_STANDARD) = 0;
-    virtual CanStatus writeDataFrame(int identifier, byte buffer[], uint8_t length) = 0;
-    virtual CanStatus writeRemoteFrame(int identifier, uint8_t length) = 0;
+    virtual CanStatus begin(uint32_t bitrate = 1'000'000, CanMode mode = CAN_STANDARD) = 0;
+    virtual CanStatus writeDataFrame(uint32_t identifier, byte buffer[], uint8_t length) = 0;
+    virtual CanStatus writeRemoteFrame(uint32_t identifier, uint8_t length) = 0;
+    virtual CanStatus configureFilter(uint32_t identifier, uint32_t mask = 0b11111111111, uint32_t filter = 0) = 0;
+    virtual CanStatus subscribe(void (*onReceive)()) = 0;
+    virtual CanStatus unsubscribe() = 0;
+
     virtual uint32_t available() = 0;
     virtual RxFrame readFrame() = 0;
 
     // helpers, perhaps easy to use than the above
-    virtual CanStatus writeDataFrameByte(int identifier, byte data);
-    virtual CanStatus writeDataFrameInt(int identifier, int data);
-    virtual CanStatus writeDataFrameLong(int identifier, long data);
-    virtual CanStatus writeDataFrameFloat(int identifier, float data);
+    virtual CanStatus writeDataFrameByte(uint32_t identifier, byte data);
+    virtual CanStatus writeDataFrameInt(uint32_t identifier, uint32_t data);
+    virtual CanStatus writeDataFrameLong(uint32_t identifier, long data);
+    virtual CanStatus writeDataFrameFloat(uint32_t identifier, float data);
 };
 
 #endif // CANBUS_H

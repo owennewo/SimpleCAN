@@ -1,16 +1,20 @@
+#if defined(HAL_FDCAN_MODULE_ENABLED)
+
 #include "CanBusStm32FD.h"
 #include <string.h>
 
 // will be called from: HAL_FDCAN_Init
 extern "C" void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
+#if !defined(STM32H7xx)
 extern "C" void FDCAN1_IT0_IRQHandler();
+#endif
 extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs);
 
 uint32_t CanBusStm32FD::_rxPin;
 uint32_t CanBusStm32FD::_txPin;
 uint32_t CanBusStm32FD::_shdnPin;
 
-CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode);
+CanStatus canBusInit(uint32_t bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode);
 void canBusPostInit(FDCAN_HandleTypeDef *hfdcan);
 void (*CanBusStm32FD::_callbackFunction)() = nullptr;
 
@@ -34,7 +38,7 @@ CanBusStm32FD::CanBusStm32FD(uint32_t rxPin, uint32_t txPin, uint32_t shdnPin)
 	}
 }
 
-CanStatus CanBusStm32FD::begin(int bitrate, CanMode mode)
+CanStatus CanBusStm32FD::begin(uint32_t bitrate, CanMode mode)
 {
 
 	if (bitrate > 1000000)
@@ -79,7 +83,7 @@ CanStatus CanBusStm32FD::writeFrame(uint32_t identifier, uint32_t frameType, uin
 	uint8_t length = dlcToLength(dataLength);
 	Serial.print(length);
 	Serial.print("] ");
-	for (int byte_index = 0; byte_index < length; byte_index++)
+	for (uint32_t byte_index = 0; byte_index < length; byte_index++)
 	{
 		Serial.print(buffer[byte_index], HEX);
 		Serial.print(" ");
@@ -90,13 +94,13 @@ CanStatus CanBusStm32FD::writeFrame(uint32_t identifier, uint32_t frameType, uin
 	return status == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
-CanStatus CanBusStm32FD::writeDataFrame(int identifier, byte buffer[], uint8_t length)
+CanStatus CanBusStm32FD::writeDataFrame(uint32_t identifier, byte buffer[], uint8_t length)
 {
 	uint32_t dataLength = lengthToDLC(length);
 	return writeFrame(identifier, FDCAN_DATA_FRAME, dataLength, buffer);
 }
 
-CanStatus CanBusStm32FD::writeRemoteFrame(int identifier, uint8_t length)
+CanStatus CanBusStm32FD::writeRemoteFrame(uint32_t identifier, uint8_t length)
 {
 	return writeFrame(identifier, FDCAN_REMOTE_FRAME, FDCAN_DLC_BYTES_0, nullptr);
 }
@@ -119,30 +123,29 @@ CanStatus CanBusStm32FD::stop(void)
 	return HAL_FDCAN_Stop(&_hfdcan1) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
-CanStatus CanBusStm32FD::subscribe(void (*onReceive)(), uint32_t primaryIdentifier, uint32_t primaryIdentifierMask)
+CanStatus CanBusStm32FD::configureFilter(uint32_t identifier, uint32_t mask, uint32_t filterIndex)
+{
+	FDCAN_FilterTypeDef filter = {
+		.IdType = FDCAN_STANDARD_ID,
+		.FilterIndex = filterIndex,
+		.FilterType = FDCAN_FILTER_MASK,
+		.FilterConfig = FDCAN_FILTER_TO_RXFIFO0,
+		.FilterID1 = identifier,
+		.FilterID2 = mask};
+
+	return HAL_FDCAN_ConfigFilter(&_hfdcan1, &filter) == HAL_OK ? CAN_OK : CAN_ERROR;
+}
+
+CanStatus CanBusStm32FD::subscribe(void (*onReceive)())
 {
 	CanBusStm32FD::_callbackFunction = onReceive;
 
-	FDCAN_FilterTypeDef primaryFilter = {
-		.IdType = FDCAN_STANDARD_ID,
-		.FilterIndex = 0,
-		.FilterType = FDCAN_FILTER_MASK,
-		.FilterConfig = FDCAN_FILTER_TO_RXFIFO0,
-		.FilterID1 = primaryIdentifier,
-		.FilterID2 = primaryIdentifierMask};
-
-	if (HAL_FDCAN_ConfigFilter(&_hfdcan1, &primaryFilter) != HAL_OK)
-	{
-#ifdef CAN_DEBUG
-		Serial.println("Config filter failed");
-#endif
-		return CAN_ERROR;
-	}
 	return HAL_FDCAN_ActivateNotification(&_hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
 CanStatus CanBusStm32FD::unsubscribe()
 {
+	CanBusStm32FD::_callbackFunction = nullptr;
 	return HAL_FDCAN_DeactivateNotification(&_hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
@@ -202,9 +205,9 @@ RxFrame CanBusStm32FD::readFrame()
 	return frame;
 }
 
-int CanBusStm32FD::dlcToLength(uint32_t dlc)
+uint32_t CanBusStm32FD::dlcToLength(uint32_t dlc)
 {
-	int length = dlc >> 16;
+	uint32_t length = dlc >> 16;
 	if (length >= 13)
 	{
 		return 32 + (13 - length) * 16;
@@ -220,7 +223,7 @@ int CanBusStm32FD::dlcToLength(uint32_t dlc)
 	return length;
 }
 
-uint32_t CanBusStm32FD::lengthToDLC(int length)
+uint32_t CanBusStm32FD::lengthToDLC(uint32_t length)
 {
 	if (length <= 8)
 	{
@@ -275,20 +278,20 @@ uint32_t toMode(CanMode mode)
 	}
 }
 
-WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode)
+WEAK CanStatus canBusInit(uint32_t bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode)
 {
 
-	uint32_t clockFreq = HAL_RCC_GetSysClockFreq();
-	// uint32_t clockFreq = HAL_RCC_GetPCLK1Freq();
+	// this depends on how we set FdcanClockSelection
+	uint32_t clockFreq = HAL_RCC_GetPCLK1Freq(); // or use HAL_RCC_GetSysClockFreq();
 
 	// Looking for a timeQuanta of between 8 and 25.
 	// start at 16 and work outwards
-	// this algo is a bit different to: http://www.bittiming.can-wiki.info/
+	// this algo is inspired by: http://www.bittiming.can-wiki.info/
 
-	int baseQuanta = 16;
-	int timeQuanta = baseQuanta;
+	uint32_t baseQuanta = 16;
+	uint32_t timeQuanta = baseQuanta;
 
-	int offset = 0;
+	uint32_t offset = 0;
 	bool found = false;
 
 	while (offset <= 9)
@@ -315,9 +318,9 @@ WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode
 		return CAN_ERROR;
 	}
 
-	int prescaler = clockFreq / (bitrate * timeQuanta);
+	uint32_t prescaler = clockFreq / (bitrate * timeQuanta);
 
-	int nominalTimeSeg1 = int(0.875 * timeQuanta) - 1;
+	uint32_t nominalTimeSeg1 = uint32_t(0.875 * timeQuanta) - 1;
 
 	float samplePoint = (1.0 + nominalTimeSeg1) / timeQuanta;
 	float samplePoint2 = (1.0 + nominalTimeSeg1 + 1) / timeQuanta;
@@ -328,7 +331,7 @@ WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode
 		samplePoint = samplePoint2;
 	}
 
-	int nominalTimeSeg2 = timeQuanta - nominalTimeSeg1 - 1;
+	uint32_t nominalTimeSeg2 = timeQuanta - nominalTimeSeg1 - 1;
 
 #ifdef CAN_DEBUG
 	Serial.print("clockFreq:");
@@ -358,10 +361,9 @@ WEAK CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hfdcan, CanMode mode
 
 	init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster/longer FDCAN_FRAME_FD_BRS;
 	init->Mode = toMode(mode);				 // FDCAN_MODE_NORMAL;
-	// TODO: which of these do we want as default?
-	// init->AutoRetransmission = DISABLE;
-	// init->TransmitPause = ENABLE;
-	// init->ProtocolException = DISABLE;
+	init->AutoRetransmission = ENABLE;
+	init->TransmitPause = DISABLE;
+	init->ProtocolException = DISABLE;
 
 	init->NominalPrescaler = (uint16_t)prescaler;
 	init->NominalSyncJumpWidth = 1;
@@ -416,8 +418,8 @@ WEAK void canBusPostInit(FDCAN_HandleTypeDef *hfdcan)
 
 #if defined(STM32G4xx)
 	// TODO: This is not availanle for H7, should we set another options?
-	periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PCLK1;
-	// periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
+	// periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PCLK1;
+	periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
 #elif defined(STM32H7xx)
 	periphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
 
@@ -453,3 +455,4 @@ WEAK void canBusPostInit(FDCAN_HandleTypeDef *hfdcan)
 	HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
 }
+#endif
