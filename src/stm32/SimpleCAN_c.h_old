@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <SimpleCAN.h>
 
-extern "C" void CAN1_RX0_IRQHandler(void); 
+extern "C" void CAN1_RX0_IRQHandler(void);
 
 void CAN1_RX0_IRQHandler(void)
 {
