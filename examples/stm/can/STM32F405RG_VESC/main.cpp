@@ -1,5 +1,4 @@
-#include "board_variant.h"
-#include "stm/can_fd/can_fd_stm.h"
+#include "stm/can/can_stm.h"
 
 CanFrame rx = {};
 
