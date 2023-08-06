@@ -1,6 +1,5 @@
-#if HAL_FDCAN_MODULE_ENABLED
-
-#include "can_fd_stm.h"
+#if defined(HAL_FDCAN_MODULE_ENABLED)
+#include "can.h"
 
 extern "C" void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hcan);
 extern "C" void FDCAN1_IT0_IRQHandler();
@@ -8,13 +7,13 @@ extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hcan, uint32_t Rx
 
 CanStatus canBusInit(int bitrate, FDCAN_HandleTypeDef *hcan, CanMode mode);
 void canBusPostInit(FDCAN_HandleTypeDef *hcan);
-void (*CanStm::receiveCallback)(CanFrame *rxMessage);
+void (*Can::receiveCallback)(CanFrame *rxFrame);
 
-PinName CanStm::_pinSHDN = NC;
+// uint8_t Can::_pinSHDN = NC;
 
-FDCAN_HandleTypeDef *CanStm::_hcan;
+FDCAN_HandleTypeDef *Can::_hcan;
 
-WEAK void SIMPLEFDCAN_STM32_PINMAP(PinName pinRX, PinName pinTX, PinName pinShdn);
+WEAK void SIMPLEFDCAN_STM32_PINMAP(uint8_t pinRX, uint8_t pinTX, uint8_t pinSHDN);
 
 WEAK void SIMPLEFDCAN_STM32_INIT(FDCAN_HandleTypeDef *hcan, uint32_t bitrate, CanMode mode);
 
@@ -22,16 +21,21 @@ static const uint8_t DLCtoBytes[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 
 
 // extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hcan)
 // {
-//   CanStm::_messageReceive();
+//   Can::_messageReceive();
 // }
 
-CanStm::CanStm(PinName pinRX, PinName pinTX, PinName pinShdn)
+Can::Can(uint8_t pinRX, uint8_t pinTX, uint8_t pinSHDN) : BaseCan(pinRX, pinTX, pinSHDN)
 {
-  CanStm::_pinSHDN = pinShdn;
-  SIMPLEFDCAN_STM32_PINMAP(pinRX, pinTX, pinShdn);
+  // Can::_pinSHDN = pinSHDN;
+  // if (pinSHDN != NC)
+  // {
+  //   pinMode(pinSHDN, OUTPUT);
+  //   digitalWrite(pinSHDN, HIGH);
+  // }
+  SIMPLEFDCAN_STM32_PINMAP(pinRX, pinTX, pinSHDN);
 }
 
-CanStatus CanStm::init(uint32_t bitrate, CanMode mode)
+CanStatus Can::init(uint32_t bitrate, CanMode mode)
 {
 
   SIMPLEFDCAN_STM32_INIT(_hcan, bitrate, mode);
@@ -53,20 +57,33 @@ CanStatus CanStm::init(uint32_t bitrate, CanMode mode)
 #endif
     return CAN_ERROR;
   }
+  Serial.println("gloal filter set");
   return CAN_OK;
 }
-CanStatus CanStm::start()
+
+CanStatus Can::deinit()
 {
-  digitalWrite(CanStm::_pinSHDN, LOW);
+  return HAL_FDCAN_DeInit(_hcan) == HAL_OK ? CAN_OK : CAN_ERROR;
+}
+
+CanStatus Can::start()
+{
+  if (_pinSHDN != NC)
+  {
+    digitalWrite(Can::_pinSHDN, LOW);
+  }
   return static_cast<CanStatus>(HAL_FDCAN_Start(_hcan));
 }
-CanStatus CanStm::stop()
+CanStatus Can::stop()
 {
-  digitalWrite(CanStm::_pinSHDN, HIGH);
+  if (_pinSHDN != NC)
+  {
+    digitalWrite(Can::_pinSHDN, HIGH);
+  }
   return static_cast<CanStatus>(HAL_FDCAN_Stop(_hcan));
 }
 
-CanStatus CanStm::configureFilter(FilterType filterType, uint32_t identifier, uint32_t mask, uint32_t filterIndex)
+CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask)
 {
 
   // #ifdef CAN_DEBUG
@@ -95,105 +112,92 @@ CanStatus CanStm::configureFilter(FilterType filterType, uint32_t identifier, ui
   {
     filterConfig = FDCAN_FILTER_DISABLE;
   }
-
-  if (filterType == FILTER_ACCEPT_ALL)
+  else if (filterType == FILTER_ACCEPT_ALL)
   {
-    mask = 0; // none of the bits need to be the same as mask to match
+    mask = 0x0; // none of the bits need to be the same as mask to match
   }
 
   FDCAN_FilterTypeDef filter = {
-      .IdType = FDCAN_STANDARD_ID,
-      .FilterIndex = filterIndex,
+      .IdType = filterType == FILTER_MASK_EXTENDED_ID ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
+      .FilterIndex = 0,
       .FilterType = FDCAN_FILTER_MASK,
-      .FilterConfig = FDCAN_FILTER_TO_RXFIFO0,
+      .FilterConfig = filterConfig,
       .FilterID1 = identifier,
       .FilterID2 = mask};
 
   return static_cast<CanStatus>(HAL_FDCAN_ConfigFilter(_hcan, &filter));
 }
 
-CanStatus CanStm::writeFrame(uint32_t identifier, uint32_t frameType, uint32_t dataLength, uint8_t buffer[])
+CanStatus Can::writeFrame(CanFrame *txFrame)
 {
 
   FDCAN_TxHeaderTypeDef TxHeader = {
-      .Identifier = identifier,
-      .IdType = identifier <= 0b11111111111 ? FDCAN_STANDARD_ID : FDCAN_EXTENDED_ID,
-      .TxFrameType = frameType,
-      .DataLength = dataLength,
+      .Identifier = txFrame->identifier,
+      .IdType = txFrame->isExtended ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
+      .TxFrameType = txFrame->isRTR ? FDCAN_REMOTE_FRAME : FDCAN_DATA_FRAME,
+      .DataLength = txFrame->dataLength << 16, // FDCAN_DLC_BYTES_4
       .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
       .BitRateSwitch = FDCAN_BRS_OFF,
       .FDFormat = FDCAN_CLASSIC_CAN,
       .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
       .MessageMarker = 0};
 
-  uint32_t status = HAL_FDCAN_AddMessageToTxFifoQ(_hcan, &TxHeader, buffer);
-
 #ifdef CAN_DEBUG
   // TODO: try serial write
+  Serial.println("###");
   Serial.print("tx: ");
-  Serial.print(identifier, HEX);
+  Serial.print(txFrame->identifier, HEX);
   Serial.print(" [");
 
   // uint8_t length = dlcToLength(dataLength);
-  Serial.print(dataLength);
+  Serial.print(txFrame->dataLength);
   Serial.print("] ");
-  for (uint32_t byte_index = 0; byte_index < dataLength; byte_index++)
+  // Serial.println("###");
+  // Serial.println(dataLength);
+  // delay(1);
+  for (uint8_t byte_index = 0; byte_index < txFrame->dataLength; byte_index++)
   {
-    Serial.print(buffer[byte_index], HEX);
+    Serial.print(txFrame->data[byte_index], HEX);
     Serial.print(" ");
   }
-  Serial.println(status == HAL_OK ? "✅" : "❌");
+  // Serial.println("###");
+  Serial.flush();
 #endif
-
+  uint32_t status = HAL_FDCAN_AddMessageToTxFifoQ(_hcan, &TxHeader, txFrame->data);
+  Serial.println(status == HAL_OK ? "✅" : "❌");
+  Serial.flush();
+  delay(1);
   return status == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
-CanStatus CanStm::writeDataFrame(uint32_t identifier, byte buffer[], uint8_t length)
-{
-  return writeFrame(identifier, FDCAN_DATA_FRAME, length, buffer);
-}
-
-CanStatus CanStm::writeRemoteFrame(uint32_t identifier, uint8_t length)
-{
-  return writeFrame(identifier, FDCAN_REMOTE_FRAME, 0, nullptr);
-}
-
-uint32_t CanStm::available()
+uint32_t Can::available()
 {
   return HAL_FDCAN_GetRxFifoFillLevel(_hcan, FDCAN_RX_FIFO0);
 }
 
-CanStatus CanStm::readFrame(CanFrame *rxMessage)
+CanStatus Can::readFrame(CanFrame *rxFrame)
 {
-
-  return _readFrame(_hcan, rxMessage);
-}
-
-CanStatus CanStm::_readFrame(FDCAN_HandleTypeDef *hcan, CanFrame *rxMessage)
-{
-
   static uint8_t buffer[8] = {0};
   static FDCAN_RxHeaderTypeDef rxHeader;
 
-  CanStatus status = static_cast<CanStatus>(HAL_FDCAN_GetRxMessage(hcan, FDCAN_RX_FIFO0, &rxHeader, buffer));
+  CanStatus status = HAL_FDCAN_GetRxMessage(_hcan, FDCAN_RX_FIFO0, &rxHeader, buffer) == HAL_OK ? CAN_OK : CAN_ERROR;
   Serial.print("rx: ");
+  uint32_t dataLength = rxHeader.DataLength >> 16;
   if (status == CAN_OK)
   {
-    rxMessage->dlc = rxHeader.DataLength;
-    rxMessage->msgID = rxHeader.Identifier;
-    rxMessage->isRTR = rxHeader.RxFrameType == FDCAN_REMOTE_FRAME ? true : false;
-    rxMessage->isStandard = rxHeader.IdType == FDCAN_STANDARD_ID ? true : false;
+    rxFrame->dataLength = dataLength;
+    rxFrame->identifier = rxHeader.Identifier;
+    rxFrame->isRTR = rxHeader.RxFrameType == FDCAN_REMOTE_FRAME ? true : false;
+    rxFrame->isExtended = rxHeader.IdType == FDCAN_EXTENDED_ID ? true : false;
 
-    memcpy(rxMessage->data, buffer, DLCtoBytes[rxHeader.DataLength]);
+    memcpy(rxFrame->data, buffer, dataLength);
 
-    Serial.println(rxHeader.RxFrameType);
-    Serial.print(rxMessage->msgID, HEX);
+    Serial.print(rxFrame->identifier, HEX);
     Serial.print(" [");
 
-    // uint8_t length = dlcToLength(dataLength);
-    Serial.print(rxMessage->dlc);
+    Serial.print(dataLength);
     Serial.print("] ");
-    for (uint32_t byte_index = 0; byte_index < rxMessage->dlc; byte_index++)
+    for (uint32_t byte_index = 0; byte_index < dataLength; byte_index++)
     {
       Serial.print(buffer[byte_index], HEX);
       Serial.print(" ");
@@ -212,10 +216,15 @@ CanStatus CanStm::_readFrame(FDCAN_HandleTypeDef *hcan, CanFrame *rxMessage)
   return status;
 }
 
-CanStatus CanStm::subscribe(void (*_messageReceiveCallback)(CanFrame *rxMessage))
+CanStatus Can::subscribe(void (*_messageReceiveCallback)(CanFrame *rxFrame))
 {
   receiveCallback = _messageReceiveCallback;
   return static_cast<CanStatus>(HAL_FDCAN_ActivateNotification(_hcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0));
+}
+
+CanStatus Can::unsubscribe()
+{
+  return static_cast<CanStatus>(HAL_FDCAN_DeactivateNotification(_hcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE));
 }
 
 void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hcan)
@@ -225,47 +234,46 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hcan)
 
 void FDCAN1_IT0_IRQHandler(void)
 {
-  HAL_FDCAN_IRQHandler(CanStm::_hcan);
+  HAL_FDCAN_IRQHandler(Can::_hcan);
 }
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hcan, uint32_t RxFifo0ITs)
 {
   if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
   {
-    if (CanStm::_messageReceive == nullptr)
+    if (Can::_messageReceive == nullptr)
     {
       return;
     }
-    CanStm::_messageReceive();
+    Can::_messageReceive();
   }
 }
 
-CanStatus CanStm::unsubscribe()
+void Can::_messageReceive()
 {
-  return static_cast<CanStatus>(HAL_FDCAN_DeactivateNotification(_hcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE));
-}
-
-void CanStm::_messageReceive()
-{
-  if (CanStm::receiveCallback != nullptr)
+  if (Can::receiveCallback != nullptr)
   {
-    CanFrame rxMessage;
-    if (CanStm::_readFrame(_hcan, &rxMessage) == CAN_OK)
-    {
-      CanStm::receiveCallback(&rxMessage);
-    }
+    // CanFrame rxFrame;
+    // if (Can::_readFrame(_hcan, &rxFrame) == CAN_OK)
+    // {
+    Serial.println("CALLBACK");
+    // Can::receiveCallback(&rxFrame);
+    // }
   }
 }
 
-void SIMPLEFDCAN_STM32_PINMAP(PinName pinRX, PinName pinTX, PinName pinShdn)
+void SIMPLEFDCAN_STM32_PINMAP(uint8_t pinRX, uint8_t pinTX, uint8_t pinSHDN)
 {
+
+  PinName rx = static_cast<PinName>(pinRX);
+  PinName tx = static_cast<PinName>(pinTX);
   // this is the arduino way, but it relies on a good PeripheralPins.c
-  // pin_function(pinRX, pinmap_function(pinRX, PinMap_CAN_RD));
-  // pin_function(pinTX, pinmap_function(pinTX, PinMap_CAN_TD));
+  pin_function(rx, pinmap_function(rx, PinMap_CAN_RD));
+  pin_function(tx, pinmap_function(tx, PinMap_CAN_TD));
 
-  if (pinShdn != NC)
+  if (pinSHDN != NC)
   {
-    pinMode(pinShdn, OUTPUT);
+    pinMode(pinSHDN, OUTPUT);
   }
 
   // you may want to override this function with something lower level
@@ -360,7 +368,7 @@ void SIMPLEFDCAN_STM32_INIT(FDCAN_HandleTypeDef *hcan, uint32_t bitrate, CanMode
 
 #endif
 
-  CanStm::_hcan = new FDCAN_HandleTypeDef{
+  Can::_hcan = new FDCAN_HandleTypeDef{
       .Instance = FDCAN1,
       .Init = {
           .ClockDivider = FDCAN_CLOCK_DIV1,
@@ -393,7 +401,7 @@ void SIMPLEFDCAN_STM32_INIT(FDCAN_HandleTypeDef *hcan, uint32_t bitrate, CanMode
 
 #ifdef CAN_DEBUG
 
-  uint32_t solvedBitrate = (HAL_RCC_GetPCLK1Freq() / CanStm::_hcan->Init.NominalPrescaler) / (1 + nominalTimeSeg1 + nominalTimeSeg2);
+  uint32_t solvedBitrate = (HAL_RCC_GetPCLK1Freq() / Can::_hcan->Init.NominalPrescaler) / (1 + nominalTimeSeg1 + nominalTimeSeg2);
 
   Serial.println("###### TIMINGS ######");
   Serial.print("target bitrate:");
@@ -422,6 +430,7 @@ void SIMPLEFDCAN_STM32_INIT(FDCAN_HandleTypeDef *hcan, uint32_t bitrate, CanMode
 
 WEAK void canBusPostInit(FDCAN_HandleTypeDef *hcan)
 {
+  Serial.println("canBusPostInit");
   if (hcan == NULL || hcan->Instance != FDCAN1)
   {
     return;
@@ -448,5 +457,4 @@ WEAK void canBusPostInit(FDCAN_HandleTypeDef *hcan)
   HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
 }
-
 #endif

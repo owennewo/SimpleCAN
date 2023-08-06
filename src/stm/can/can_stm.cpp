@@ -17,6 +17,12 @@ CanStm::CanStm(uint32_t rx_pin, uint32_t tx_pin, uint32_t shdnPin)
   // these pin_functions enabe port clock and set correct alternative functions/speed
   pin_function(rx_name, pinmap_function(rx_name, PinMap_CAN_RD));
   pin_function(tx_name, pinmap_function(tx_name, PinMap_CAN_TD));
+
+  if (pinSHDN != NC)
+  {
+    pinMode(pinSHDN, OUTPUT);
+    digitalWrite(pinSHDN, HIGH);
+  }
 }
 
 CanStatus CanStm::init(uint32_t bitrate, CanMode mode)
@@ -42,10 +48,18 @@ CanStatus CanStm::init(uint32_t bitrate, CanMode mode)
 }
 CanStatus CanStm::start()
 {
+  if (_pinSHDN != NC)
+  {
+    digitalWrite(CanStm::_pinSHDN, LOW);
+  }
   return static_cast<CanStatus>(HAL_CAN_Start(_hcan));
 }
 CanStatus CanStm::stop()
 {
+  if (_pinSHDN != NC)
+  {
+    digitalWrite(CanStm::_pinSHDN, HIGH);
+  }
   return static_cast<CanStatus>(HAL_CAN_Stop(_hcan));
 }
 

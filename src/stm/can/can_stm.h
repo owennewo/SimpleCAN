@@ -22,7 +22,7 @@ public:
 	CanStatus writeDataFrame(uint32_t identifier, byte buffer[], uint8_t length) override;
 	CanStatus writeRemoteFrame(uint32_t identifier, uint8_t length) override;
 
-	uint32_t available() override;
+	// uint32_t available() override;
 
 	CanStatus subscribe(void (*_messageReceiveCallback)(CanFrame *rxMessage) = nullptr) override;
 	CanStatus unsubscribe() override;
@@ -35,7 +35,7 @@ public:
 	static CAN_HandleTypeDef *_hcan;
 
 private:
-	CanStatus writeFrame(uint32_t identifier, uint32_t frameType, uint32_t dataLength, uint8_t data[]);
+	CanStatus writeFrame(uint32_t identifier, , bool isRTR, uint32_t dataLength, uint8_t data[]);
 	CAN_RxHeaderTypeDef _rxHeader;
 	uint8_t *_rxData;
 };
