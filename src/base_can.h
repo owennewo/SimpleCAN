@@ -6,6 +6,10 @@
 #define NC 0xFF
 #endif
 
+#ifndef MAX_FRAME_SIZE
+#define MAX_FRAME_SIZE 64
+#endif
+
 #ifndef CAN_SHDN
 #define CAN_SHDN NC
 #endif
@@ -14,7 +18,7 @@ enum CanMode
 {
     CAN_STANDARD = 0x00U,
     CAN_LOOPBACK = 0x01U,
-    CAN_LOOPBACK_EXTERNAL = 0x02U,
+    // CAN_LOOPBACK_EXTERNAL = 0x02U,  <-- some boards support this
 };
 
 enum CanStatus
@@ -27,9 +31,10 @@ enum CanStatus
 enum FilterType
 {
     FILTER_DISABLE = 0x00U,
-    FILTER_MASK_STANDARD_ID = 0x01U,
-    FILTER_MASK_EXTENDED_ID = 0x02U,
-    FILTER_ACCEPT_ALL = 0x03U
+    FILTER_MASK_STANDARD = 0x01U,
+    FILTER_MASK_EXTENDED = 0x02U,
+    FILTER_ACCEPT_ALL_STANDARD = 0x03U,
+    FILTER_ACCEPT_ALL_EXTENDED = 0x04U
 };
 
 struct CanFrame
@@ -38,7 +43,7 @@ struct CanFrame
     bool isRTR;
     bool isExtended;
     uint32_t dataLength;
-    uint8_t data[8];
+    uint8_t data[MAX_FRAME_SIZE];
 };
 
 struct CanTiming
@@ -70,6 +75,7 @@ public:
 
 protected:
     virtual CanTiming solveCanTiming(uint32_t clockFreq, uint32_t bitrate);
+    void logFrame(CanFrame *txFrame);
     uint16_t _pinRX;
     uint16_t _pinTX;
     uint16_t _pinSHDN;

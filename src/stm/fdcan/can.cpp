@@ -6,15 +6,12 @@
 extern "C" void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
 extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs);
 
-// #if !defined(STM32H7)
 void FDCAN1_IT0_IRQHandler();
-// #endif
 
 uint32_t Can::_shdnPin;
 FDCAN_RxHeaderTypeDef _rxHeader{};
 FDCAN_HandleTypeDef Can::_hfdcan1 = {};
 
-void canBusPostInit(FDCAN_HandleTypeDef *hfdcan);
 void (*Can::_callbackFunction)() = nullptr;
 
 Can::Can(uint16_t rxPin, uint16_t txPin, uint16_t shdnPin) : BaseCan(rxPin, txPin, shdnPin)
@@ -45,21 +42,31 @@ CanStatus Can::init(uint32_t bitrate, CanMode mode)
     return CAN_ERROR;
   }
 
-  // __HAL_RCC_SYSCFG_CLK_ENABLE();
-  // this depends on how we set FdcanClockSelection
-  // uint32_t clockFreq = 480000000;
-  // uint32_t clockFreq = HAL_RCC_GetSysClockFreq();
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
+  PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  {
+    // Error_Handler();
+  }
+
+  __HAL_RCC_FDCAN_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
+
   uint32_t clockFreq = HAL_RCC_GetPCLK1Freq(); // or use HAL_RCC_GetSysClockFreq();
 
   CanTiming timing = solveCanTiming(clockFreq, bitrate);
   FDCAN_InitTypeDef *init = &(_hfdcan1.Init);
-#if defined(STM32G4xx)
-  // TODO: This is not availanle for H7, should we set another options?
-  init->ClockDivider = FDCAN_CLOCK_DIV1; //<- this is on G4 but not H7
-#endif
+  // #if defined(STM32G4xx)
+  //   // TODO: This is not availanle for H7, should we set another options?
+  //   init->ClockDivider = FDCAN_CLOCK_DIV1; //<- this is on G4 but not H7
+  // #endif
 
-  init->FrameFormat = FDCAN_FRAME_CLASSIC;   // TODO: We may want to support faster/longer FDCAN_FRAME_FD_BRS;
-  init->Mode = FDCAN_MODE_INTERNAL_LOOPBACK; // toMode(mode);               // FDCAN_MODE_NORMAL;
+  init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster/longer FDCAN_FRAME_FD_BRS;
+  init->Mode = mode == CAN_LOOPBACK ? FDCAN_MODE_INTERNAL_LOOPBACK : FDCAN_MODE_NORMAL;
   init->AutoRetransmission = DISABLE;
   init->TransmitPause = DISABLE;
   init->ProtocolException = DISABLE;
@@ -118,12 +125,11 @@ CanStatus Can::deinit()
 
 CanStatus Can::writeFrame(CanFrame *txFrame)
 {
-  uint32_t dataLength = txFrame->dataLength << 16;
   FDCAN_TxHeaderTypeDef TxHeader = {
       .Identifier = txFrame->identifier,
       .IdType = txFrame->isExtended ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
       .TxFrameType = txFrame->isRTR ? FDCAN_REMOTE_FRAME : FDCAN_DATA_FRAME,
-      .DataLength = dataLength,
+      .DataLength = lengthToDLC(txFrame->dataLength),
       .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
       .BitRateSwitch = FDCAN_BRS_OFF,
       .FDFormat = FDCAN_CLASSIC_CAN,
@@ -133,19 +139,8 @@ CanStatus Can::writeFrame(CanFrame *txFrame)
   HAL_StatusTypeDef status = HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan1, &TxHeader, txFrame->data);
 
 #ifdef CAN_DEBUG
-  Serial.print("tx: ");
-  Serial.print(txFrame->identifier, HEX);
-  Serial.print(" [");
-
-  uint8_t length = dlcToLength(dataLength);
-  Serial.print(length);
-  Serial.print("] ");
-  for (uint32_t byte_index = 0; byte_index < length; byte_index++)
-  {
-    Serial.print(txFrame->data[byte_index], HEX);
-    Serial.print(" ");
-  }
-  Serial.println(status == HAL_OK ? "✅" : "❌");
+  Serial.print("tx >> ");
+  logFrame(txFrame);
 #endif
 
   return status == HAL_OK ? CAN_OK : CAN_ERROR;
@@ -172,7 +167,9 @@ CanStatus Can::stop(void)
 CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask, bool maskRtrBit, bool identifierRtrBit)
 {
   FDCAN_FilterTypeDef filter = {
-      .IdType = filterType == FILTER_MASK_EXTENDED_ID ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
+      .IdType = (filterType == FILTER_MASK_EXTENDED || filterType == FILTER_ACCEPT_ALL_EXTENDED)
+                    ? FDCAN_EXTENDED_ID
+                    : FDCAN_STANDARD_ID,
       .FilterIndex = 0,
       .FilterType = FDCAN_FILTER_MASK,
       .FilterConfig = FDCAN_FILTER_TO_RXFIFO0,
@@ -195,10 +192,9 @@ CanStatus Can::unsubscribe()
   return HAL_FDCAN_DeactivateNotification(&_hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
-/* Implentaing STM32 weak function */
 void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan)
 {
-  canBusPostInit(hfdcan);
+  // not doing anything here, but most examples set clocks/pins here.  We do it inside the class (constructor/init) instead
 }
 
 void FDCAN1_IT0_IRQHandler(void)
@@ -223,154 +219,109 @@ uint32_t Can::available()
   return HAL_FDCAN_GetRxFifoFillLevel(&_hfdcan1, FDCAN_RX_FIFO0);
 }
 
-CanStatus Can::readFrame(CanFrame *rxMessage)
+CanStatus Can::readFrame(CanFrame *rxFrame)
 {
-  if (available() == 0)
-  {
-#ifdef CAN_DEBUG
-    Serial.println("rx: no data 🚫");
-#endif
-    return CAN_NO_DATA;
-  }
 
-#ifdef CAN_DEBUG
-  Serial.print("rx: ");
-#endif
-  if (HAL_FDCAN_GetRxMessage(&_hfdcan1, FDCAN_RX_FIFO0, &_rxHeader, rxMessage->data) != HAL_OK)
+  if (HAL_FDCAN_GetRxMessage(&_hfdcan1, FDCAN_RX_FIFO0, &_rxHeader, rxFrame->data) != HAL_OK)
   {
-
-#ifdef CAN_DEBUG
-    Serial.println("❌");
-    // Serial.print("GetRxMessage failed2");
-#endif
     return CAN_ERROR;
   }
   else
   {
-    rxMessage->identifier = _rxHeader.Identifier;
-    rxMessage->isRTR = _rxHeader.RxFrameType == FDCAN_REMOTE_FRAME;
-    rxMessage->dataLength = dlcToLength(_rxHeader.DataLength);
-    rxMessage->isExtended = _rxHeader.IdType == FDCAN_EXTENDED_ID;
+    rxFrame->identifier = _rxHeader.Identifier;
+    rxFrame->isRTR = _rxHeader.RxFrameType == FDCAN_REMOTE_FRAME;
+    rxFrame->dataLength = dlcToLength(_rxHeader.DataLength);
+    rxFrame->isExtended = _rxHeader.IdType == FDCAN_EXTENDED_ID;
 
 #ifdef CAN_DEBUG
-    Serial.print(rxMessage->identifier, HEX);
-    Serial.print(" [");
-
-    // uint8_t length = dlcToLength(dataLength);
-    Serial.print(rxMessage->dataLength);
-    Serial.print("] ");
-    for (uint32_t byte_index = 0; byte_index < rxMessage->dataLength; byte_index++)
-    {
-      Serial.print(rxMessage->data[byte_index], HEX);
-      Serial.print(" ");
-    }
-    Serial.println("✅");
+    Serial.print("rx << ");
+    logFrame(rxFrame);
 #endif
-  }
 
-  return CAN_OK;
+    return CAN_OK;
+  }
 }
 
 uint32_t Can::dlcToLength(uint32_t dlc)
 {
-  uint32_t length = dlc >> 16;
-  if (length >= 13)
+  switch (dlc)
   {
-    return 32 + (13 - length) * 16;
-  }
-  else if (length == 12)
-  {
+  case FDCAN_DLC_BYTES_0:
+    return 0;
+  case FDCAN_DLC_BYTES_1:
+    return 1;
+  case FDCAN_DLC_BYTES_2:
+    return 2;
+  case FDCAN_DLC_BYTES_3:
+    return 3;
+  case FDCAN_DLC_BYTES_4:
+    return 4;
+  case FDCAN_DLC_BYTES_5:
+    return 5;
+  case FDCAN_DLC_BYTES_6:
+    return 6;
+  case FDCAN_DLC_BYTES_7:
+    return 7;
+  case FDCAN_DLC_BYTES_8:
+    return 8;
+  case FDCAN_DLC_BYTES_12:
+    return 12;
+  case FDCAN_DLC_BYTES_16:
+    return 16;
+  case FDCAN_DLC_BYTES_20:
+    return 20;
+  case FDCAN_DLC_BYTES_24:
     return 24;
+  case FDCAN_DLC_BYTES_32:
+    return 32;
+  case FDCAN_DLC_BYTES_48:
+    return 48;
+  case FDCAN_DLC_BYTES_64:
+    return 64;
+  default:
+    return 0; // or handle as an error
   }
-  else if (length >= 9)
-  {
-    return 12 + (9 - length) * 4;
-  }
-  return length;
 }
 
 uint32_t Can::lengthToDLC(uint32_t length)
 {
-  if (length <= 8)
+  switch (length)
   {
-    return length << 16;
-  }
-  else if (length <= 12)
-  {
+  case 0:
+    return FDCAN_DLC_BYTES_0;
+  case 1:
+    return FDCAN_DLC_BYTES_1;
+  case 2:
+    return FDCAN_DLC_BYTES_2;
+  case 3:
+    return FDCAN_DLC_BYTES_3;
+  case 4:
+    return FDCAN_DLC_BYTES_4;
+  case 5:
+    return FDCAN_DLC_BYTES_5;
+  case 6:
+    return FDCAN_DLC_BYTES_6;
+  case 7:
+    return FDCAN_DLC_BYTES_7;
+  case 8:
+    return FDCAN_DLC_BYTES_8;
+  case 12:
     return FDCAN_DLC_BYTES_12;
-  }
-  else if (length <= 16)
-  {
+  case 16:
     return FDCAN_DLC_BYTES_16;
-  }
-  else if (length <= 20)
-  {
+  case 20:
     return FDCAN_DLC_BYTES_20;
-  }
-  else if (length <= 24)
-  {
+  case 24:
     return FDCAN_DLC_BYTES_24;
-  }
-  else if (length <= 32)
-  {
+  case 32:
     return FDCAN_DLC_BYTES_32;
-  }
-  else if (length <= 48)
-  {
+  case 48:
     return FDCAN_DLC_BYTES_48;
-  }
-  else if (length <= 64)
-  {
+  case 64:
     return FDCAN_DLC_BYTES_64;
-  }
-  else
-  {
-    // Error handling: Data length is out of range
-    // You may want to handle this case appropriately for your application
-    return 0;
-  }
-}
-
-uint32_t toMode(CanMode mode)
-{
-  switch (mode)
-  {
-  case CAN_LOOPBACK:
-    return FDCAN_MODE_EXTERNAL_LOOPBACK;
-  case CAN_LOOPBACK_EXTERNAL:
-    return FDCAN_MODE_EXTERNAL_LOOPBACK;
   default:
-    return FDCAN_MODE_NORMAL;
+    return 0; // or handle as an error
   }
 }
 
-WEAK void canBusPostInit(FDCAN_HandleTypeDef *hfdcan)
-{
-
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-  if (hfdcan->Instance == FDCAN1)
-  {
-
-    /** Initializes the peripherals clock
-     */
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
-    PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
-    {
-      // Error_Handler();
-    }
-
-    /* Peripheral clock enable */
-    __HAL_RCC_FDCAN_CLK_ENABLE();
-
-#if defined(STM32H7)
-    __HAL_RCC_GPIOH_CLK_ENABLE();
-#endif
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-
-    /* FDCAN1 interrupt Init */
-    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
-  }
-}
 #endif

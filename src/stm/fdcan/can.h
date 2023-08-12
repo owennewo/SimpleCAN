@@ -27,7 +27,6 @@ public:
 	static FDCAN_HandleTypeDef _hfdcan1;
 
 	// todo make this private
-	uint32_t dlcToLength(uint32_t dlc);
 	static uint32_t _rxPin;
 	static uint32_t _txPin;
 	static uint32_t _shdnPin;
@@ -36,6 +35,8 @@ public:
 private:
 	WEAK void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
 	uint32_t lengthToDLC(uint32_t length);
+	uint32_t dlcToLength(uint32_t dlc);
+
 	FDCAN_RxHeaderTypeDef _rxHeader;
 	// uint8_t _rxData[8];
 };

@@ -101,7 +101,7 @@ void test_filter(uint8_t testIndex, uint32_t acceptance_code, uint32_t mask, uin
 #error "No CAN module is enabled, expecting a define for ARDUINO_ARCH_ESP32 | HAL_CAN_MODULE_ENABLED | HAL_FDCAN_MODULE_ENABLED"
 #endif
 
-    FilterType filterType = isExtended ? FILTER_MASK_EXTENDED_ID : FILTER_MASK_STANDARD_ID;
+    FilterType filterType = isExtended ? FILTER_MASK_EXTENDED : FILTER_MASK_STANDARD;
 
     can.init(500000, CanMode::CAN_LOOPBACK);
     can.filter(filterType, acceptance_code, mask, maskRtrBit, filterRtrBit);

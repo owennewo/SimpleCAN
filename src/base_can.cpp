@@ -67,8 +67,6 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate)
     Serial.print(clockFreq);
     Serial.print(", bitrate:");
     Serial.print(bitrate);
-    Serial.print(", core:");
-    Serial.print(clockFreq);
     Serial.print(", prescaler:");
     Serial.print(timing.prescaler);
     Serial.print(", timeQuanta:");
@@ -82,4 +80,20 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate)
 
 #endif
     return timing;
+}
+
+void BaseCan::logFrame(CanFrame *frame)
+{
+    Serial.print(frame->identifier, HEX);
+    Serial.print(" [");
+
+    // uint8_t length = dlcToLength(dataLength);
+    Serial.print(frame->dataLength);
+    Serial.print("] ");
+    for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
+    {
+        Serial.print(frame->data[byte_index], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
 }
