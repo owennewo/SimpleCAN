@@ -6,6 +6,10 @@
 #define NC 0xFF
 #endif
 
+#ifndef CAN_SHDN
+#define CAN_SHDN NC
+#endif
+
 enum CanMode
 {
     CAN_STANDARD = 0x00U,
@@ -49,7 +53,7 @@ class BaseCan
 {
 
 public:
-    BaseCan(uint8_t pinRX, uint8_t pinTX, uint8_t pinSHDN = NC);
+    BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN = NC);
 
     // setup methods
     virtual CanStatus init(uint32_t bitrate = 1000000, CanMode mode = CAN_STANDARD) = 0;
@@ -65,8 +69,8 @@ public:
     virtual CanStatus readFrame(CanFrame *rxMessage) = 0;
 
 protected:
-    CanTiming solveCanTiming(uint32_t bitrate);
-    uint8_t _pinRX;
-    uint8_t _pinTX;
-    uint8_t _pinSHDN;
+    virtual CanTiming solveCanTiming(uint32_t clockFreq, uint32_t bitrate);
+    uint16_t _pinRX;
+    uint16_t _pinTX;
+    uint16_t _pinSHDN;
 };

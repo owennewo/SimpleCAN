@@ -1,8 +1,12 @@
-#include "simplecan.h"
-#include <unity.h>
+#pragma once
 
+#include "simplecan.h"
+// #include <unity_internals.h>
 #define EXPECT_MESSAGE_ACCEPTED true
 #define EXPECT_MESSAGE_REJECTED false
+
+// namespace TestSimpleCAN
+// {
 
 extern bool isExtendedFrame;
 extern uint32_t frame______same;
@@ -22,6 +26,7 @@ void test_loopback_write_then_read(Can *can, uint8_t testIndex, uint32_t identif
 #ifndef ARDUINO_ARCH_ESP32
     snprintf(test_name, sizeof(test_name), "test_loopback_write_then_read | rx_queue_is_initially_empty | %d", testIndex);
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, can->available(), test_name);
+    UNITY_TEST_ASSERT_EQUAL_INT16(0, can->available(), 1, test_name);
 #endif
 
     txFrame.identifier = identifier;
@@ -30,7 +35,7 @@ void test_loopback_write_then_read(Can *can, uint8_t testIndex, uint32_t identif
 
     if (isRtrFrame)
     {
-        txFrame.dataLength = 0;
+        txFrame.dataLength = 4; // The spec allows rtr to have length > 0!!
     }
     else
     {
@@ -57,6 +62,8 @@ void test_loopback_write_then_read(Can *can, uint8_t testIndex, uint32_t identif
         TEST_ASSERT_EQUAL_INT_MESSAGE(identifier, rxFrame.identifier, test_name);
         snprintf(test_name, sizeof(test_name), "test_loopback_write_then_read | test_is_extended | %d", testIndex);
         TEST_ASSERT_EQUAL_INT_MESSAGE(isExtended, rxFrame.isExtended, test_name);
+        snprintf(test_name, sizeof(test_name), "test_loopback_write_then_read | test_is_length=4 | %d", testIndex);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(4, rxFrame.dataLength, test_name);
         if (!isRtrFrame)
         {
             long rx_data = (rxFrame.data[0] << 24) + (rxFrame.data[1] << 16) + (rxFrame.data[2] << 8) + rxFrame.data[3];
@@ -87,7 +94,7 @@ void test_filter(uint8_t testIndex, uint32_t acceptance_code, uint32_t mask, uin
 #if defined(ARDUINO_ARCH_ESP32)
     Can can(GPIO_NUM_4, GPIO_NUM_5);
 #elif defined(HAL_CAN_MODULE_ENABLED)
-    Can can; //(PA_11, PB_9, PB_4);
+    Can can(PB_8, PB_9, NC);
 #elif defined(HAL_FDCAN_MODULE_ENABLED)
     Can can(PA_11, PB_9, PB_4);
 #else
@@ -96,14 +103,15 @@ void test_filter(uint8_t testIndex, uint32_t acceptance_code, uint32_t mask, uin
 
     FilterType filterType = isExtended ? FILTER_MASK_EXTENDED_ID : FILTER_MASK_STANDARD_ID;
 
-    can.filter(filterType, acceptance_code, mask, maskRtrBit, filterRtrBit);
     can.init(500000, CanMode::CAN_LOOPBACK);
+    can.filter(filterType, acceptance_code, mask, maskRtrBit, filterRtrBit);
+
     can.start();
-    delay(100);
+    delay(10);
     test_loopback_write_then_read(&can, testIndex, identifier, isExtended, isRtrFrame, expectPass);
-    delay(100);
+    delay(10);
     can.stop();
-    delay(100);
+    delay(10);
     can.deinit();
 }
 
@@ -320,5 +328,6 @@ void test_remote_frame_no_match_identifier_rtr_bit_not_matching()
 
 void test_filter_dummy()
 {
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, 1, "This is always true");
+    // UNITY_TEST_ASSERT_EQUAL_INT16(1, 1, 1, "This is always true");
 }
+// }
