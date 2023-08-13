@@ -17,7 +17,7 @@ void setup()
 {
     delay(1000);
 
-        UNITY_BEGIN();
+    UNITY_BEGIN();
     // frame identifier identical filter
     RUN_TEST(test_data_frame_identical_identifier_ignore_rtr_bit);
     RUN_TEST(test_data_frame_identical_identifier_rtr_bit_is_data_for_filter_and_frame);

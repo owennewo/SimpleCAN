@@ -71,6 +71,8 @@ CanStatus Can::stop()
 
 CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask, bool maskRtrBit, bool identifierRtrBit)
 {
+    // it isn't possible to set filters after init, so we need to deinit and reinit
+    deinit();
 
     if (filterType == FilterType::FILTER_ACCEPT_ALL)
     {

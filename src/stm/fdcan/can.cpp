@@ -104,10 +104,8 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
   {
   case FILTER_DISABLE:
     return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
-  case FILTER_ACCEPT_ALL_STANDARD:
-    return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
-  case FILTER_ACCEPT_ALL_EXTENDED:
-    return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+  case FILTER_ACCEPT_ALL:
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
   case FILTER_MASK_STANDARD:
     if (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK)
     {
@@ -123,7 +121,7 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
   }
 
   FDCAN_FilterTypeDef filter = {
-      .IdType = (filterType == FILTER_MASK_EXTENDED || filterType == FILTER_ACCEPT_ALL_EXTENDED)
+      .IdType = filterType == FILTER_MASK_EXTENDED
                     ? FDCAN_EXTENDED_ID
                     : FDCAN_STANDARD_ID,
       .FilterIndex = 0,

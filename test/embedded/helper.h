@@ -95,8 +95,8 @@ void test_filter(uint8_t testIndex, uint32_t acceptance_code, uint32_t mask, uin
 
     FilterType filterType = isExtended ? FILTER_MASK_EXTENDED : FILTER_MASK_STANDARD;
 
-    can.filter(filterType, acceptance_code, mask, maskRtrBit, filterRtrBit);
     can.init(CanMode::CAN_LOOPBACK, 250000);
+    can.filter(filterType, acceptance_code, mask, maskRtrBit, filterRtrBit);
 
     can.start();
     delay(10);

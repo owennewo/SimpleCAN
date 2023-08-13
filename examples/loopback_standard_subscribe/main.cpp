@@ -23,14 +23,14 @@ void setup()
     Serial.begin(230400);
     delay(2000);
 
-    can.init(CAN_LOOPBACK, 250000);         // <- start in LOOPBACK mode (for testing), and move to NORMAL mode later
-    can.filter(FILTER_ACCEPT_ALL_STANDARD); // <- accepting all *STANDARD* frames, without this readFrame won't work
-    can.subscribe(&receiveCallback);        // subscribe to receive a callback (in interrupt routine)
-    can.start();                            // <- start CAN peripheral, if CAN_SHDN is defined, it will also enable CAN transceiver
+    can.init(CAN_LOOPBACK, 250000);  // <- start in LOOPBACK mode (for testing), and move to NORMAL mode later
+    can.filter(FILTER_ACCEPT_ALL);   // <- accepting all frames, without this readFrame won't work
+    can.subscribe(&receiveCallback); // subscribe to receive a callback (in interrupt routine) - not available on all boards
+    can.start();                     // <- start CAN peripheral, if CAN_SHDN is defined, it will also enable CAN transceiver
 
     // prepare frame
     txFrame.identifier = 0x321; // <- 11-bit identifier (extended).
-    txFrame.isExtended = false; // <- NOTE FILTER STANDARD
+    txFrame.isExtended = false; // <- frame is STANDARD type
     txFrame.isRTR = false;      // <- this is a data frame, not a remote frame
     txFrame.dataLength = 4;     // <- all boards support 8 bytes (can 2b), but some boards support 4 bytes (fdcan)
 
