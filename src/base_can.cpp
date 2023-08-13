@@ -4,9 +4,7 @@ BaseCan::BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : _pinRX(pinR
 {
     if (pinSHDN != NC)
     {
-        // Serial.println("SHDN pin is not NC");
         pinMode(pinSHDN, OUTPUT);
-        // digitalWrite(pinSHDN, HIGH);
     }
 }
 
@@ -40,12 +38,10 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate)
         }
         offset += 1;
     }
+
     if (!found)
     {
-#ifdef CAN_DEBUG
-        Serial.println("timeQuanta out of range");
-#endif
-        return timing;
+        failAndBlink(CAN_ERROR_TIMING);
     }
 
     timing.prescaler = clockFreq / (bitrate * timeQuanta);
@@ -96,4 +92,23 @@ void BaseCan::logFrame(CanFrame *frame)
         Serial.print(" ");
     }
     Serial.println();
+}
+
+void BaseCan::failAndBlink(CanErrorType errorType)
+{
+#ifdef CAN_DEBUG
+    Serial.print("fatal error: ");
+    Serial.println(errorType, HEX);
+#endif
+    while (1)
+    {
+        for (uint8_t i = 0; i < errorType; i++)
+        {
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(200);
+            digitalWrite(LED_BUILTIN, LOW);
+            delay(200);
+        }
+        delay(1000);
+    }
 }

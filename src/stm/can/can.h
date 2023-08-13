@@ -12,7 +12,7 @@ public:
 	// constructor
 	Can(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN = NC);
 
-	CanStatus init(uint32_t bitrate = 1'000'000, CanMode mode = CAN_STANDARD) override;
+	CanStatus init(CanMode mode = CAN_STANDARD, uint32_t bitrate = 250000) override;
 	CanStatus deinit() override;
 
 	CanStatus filter(FilterType filterType, uint32_t identifier = 0b11111111111, uint32_t mask = 0b11111111111, bool maskRtrBit = false, bool identifierRtrBit = false) override;
@@ -24,14 +24,13 @@ public:
 
 	uint32_t available();
 
-	CanStatus subscribe(void (*_messageReceiveCallback)(CanFrame *rxMessage) = nullptr);
+	CanStatus subscribe(void (*_messageReceiveCallback)() = nullptr);
 	CanStatus unsubscribe();
 
-	CanStatus readFrame(CanFrame *rxMessage) override;
+	CanStatus readFrame(CanFrame *rxFrame) override;
 
 	static void _messageReceive();
-	static CanStatus _readFrame(CAN_HandleTypeDef *hcan, CanFrame *rxMessage);
-	static void (*receiveCallback)(CanFrame *rxMessage);
+	static void (*receiveCallback)();
 	static CAN_HandleTypeDef *_hcan;
 
 private:

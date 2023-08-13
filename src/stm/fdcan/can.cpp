@@ -1,14 +1,14 @@
 #if defined(HAL_FDCAN_MODULE_ENABLED)
 
 #include "can.h"
-// #include <string.h>
 
 extern "C" void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
+#ifndef STM32H7
+// H7 doesn't like this, avoiding compile 'multiple definition' error
+extern "C" void FDCAN1_IT0_IRQHandler();
+#endif
 extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs);
 
-void FDCAN1_IT0_IRQHandler();
-
-uint32_t Can::_shdnPin;
 FDCAN_RxHeaderTypeDef _rxHeader{};
 FDCAN_HandleTypeDef Can::_hfdcan1 = {};
 
@@ -31,27 +31,26 @@ Can::Can(uint16_t rxPin, uint16_t txPin, uint16_t shdnPin) : BaseCan(rxPin, txPi
   }
 }
 
-CanStatus Can::init(uint32_t bitrate, CanMode mode)
+CanStatus Can::init(CanMode mode, uint32_t bitrate)
 {
 
   if (bitrate > 1000000)
   {
-#ifdef CAN_DEBUG
-    Serial.println("bitrate > 1Mbit/s, failing");
-#endif
-    return CAN_ERROR;
+    failAndBlink(CAN_ERROR_BITRATE_TOO_HIGH);
   }
 
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
   PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
+
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
-    // Error_Handler();
+    failAndBlink(CAN_ERROR_CLOCK);
   }
 
   __HAL_RCC_FDCAN_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+  // __HAL_RCC_GPIOH_CLK_ENABLE();
+  // __HAL_RCC_GPIOB_CLK_ENABLE();
 
   HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
@@ -60,12 +59,8 @@ CanStatus Can::init(uint32_t bitrate, CanMode mode)
 
   CanTiming timing = solveCanTiming(clockFreq, bitrate);
   FDCAN_InitTypeDef *init = &(_hfdcan1.Init);
-  // #if defined(STM32G4xx)
-  //   // TODO: This is not availanle for H7, should we set another options?
-  //   init->ClockDivider = FDCAN_CLOCK_DIV1; //<- this is on G4 but not H7
-  // #endif
 
-  init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster/longer FDCAN_FRAME_FD_BRS;
+  init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster FDCAN_FRAME_FD_BRS;
   init->Mode = mode == CAN_LOOPBACK ? FDCAN_MODE_INTERNAL_LOOPBACK : FDCAN_MODE_NORMAL;
   init->AutoRetransmission = DISABLE;
   init->TransmitPause = DISABLE;
@@ -90,6 +85,7 @@ CanStatus Can::init(uint32_t bitrate, CanMode mode)
   init->MessageRAMOffset = 0;
   init->RxFifo0ElmtsNbr = 32;
   init->RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
+  // not using RxFifo1
   // init->RxFifo1ElmtsNbr = 8;
   // init->RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
   init->RxBuffersNbr = 8;
@@ -100,6 +96,7 @@ CanStatus Can::init(uint32_t bitrate, CanMode mode)
   init->TxElmtSize = FDCAN_DATA_BYTES_8;
 #endif
 
+  Serial.println("init2");
   if (HAL_FDCAN_Init(&_hfdcan1) != HAL_OK)
   {
 #ifdef CAN_DEBUG
@@ -108,13 +105,6 @@ CanStatus Can::init(uint32_t bitrate, CanMode mode)
     return CAN_ERROR;
   }
 
-  if (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE))
-  {
-#ifdef CAN_DEBUG
-    Serial.println("CAN configGlobalFilter failed");
-    return CAN_ERROR;
-#endif
-  }
   return CAN_OK;
 }
 
@@ -125,6 +115,11 @@ CanStatus Can::deinit()
 
 CanStatus Can::writeFrame(CanFrame *txFrame)
 {
+#ifdef CAN_DEBUG
+  Serial.print("tx >> ");
+  logFrame(txFrame);
+#endif
+
   FDCAN_TxHeaderTypeDef TxHeader = {
       .Identifier = txFrame->identifier,
       .IdType = txFrame->isExtended ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
@@ -137,11 +132,6 @@ CanStatus Can::writeFrame(CanFrame *txFrame)
       .MessageMarker = 0};
 
   HAL_StatusTypeDef status = HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan1, &TxHeader, txFrame->data);
-
-#ifdef CAN_DEBUG
-  Serial.print("tx >> ");
-  logFrame(txFrame);
-#endif
 
   return status == HAL_OK ? CAN_OK : CAN_ERROR;
 }
@@ -166,6 +156,29 @@ CanStatus Can::stop(void)
 
 CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask, bool maskRtrBit, bool identifierRtrBit)
 {
+
+  switch (filterType)
+  {
+  case FILTER_DISABLE:
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+  case FILTER_ACCEPT_ALL_STANDARD:
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+  case FILTER_ACCEPT_ALL_EXTENDED:
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+  case FILTER_MASK_STANDARD:
+    if (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK)
+    {
+      return CAN_ERROR;
+    }
+    break;
+  case FILTER_MASK_EXTENDED:
+    if (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK)
+    {
+      return CAN_ERROR;
+    }
+    break;
+  }
+
   FDCAN_FilterTypeDef filter = {
       .IdType = (filterType == FILTER_MASK_EXTENDED || filterType == FILTER_ACCEPT_ALL_EXTENDED)
                     ? FDCAN_EXTENDED_ID
@@ -194,7 +207,9 @@ CanStatus Can::unsubscribe()
 
 void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan)
 {
-  // not doing anything here, but most examples set clocks/pins here.  We do it inside the class (constructor/init) instead
+  __HAL_RCC_FDCAN_CLK_ENABLE(); //<- this has to be enabled in this init callback
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 }
 
 void FDCAN1_IT0_IRQHandler(void)

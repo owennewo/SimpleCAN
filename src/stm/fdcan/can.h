@@ -9,7 +9,7 @@ class Can : public BaseCan
 public:
 	Can(uint16_t rxPin, uint16_t txPin, uint16_t shdnPin = NC);
 
-	CanStatus init(uint32_t bitrate = 1000000, CanMode mode = CAN_STANDARD) override;
+	CanStatus init(CanMode mode = CAN_STANDARD, uint32_t bitrate = 250000) override;
 	CanStatus deinit() override;
 
 	CanStatus writeFrame(CanFrame *txFrame) override;
@@ -25,19 +25,13 @@ public:
 	CanStatus stop() override;
 
 	static FDCAN_HandleTypeDef _hfdcan1;
-
-	// todo make this private
-	static uint32_t _rxPin;
-	static uint32_t _txPin;
-	static uint32_t _shdnPin;
 	static void (*_callbackFunction)();
 
 private:
 	WEAK void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
 	uint32_t lengthToDLC(uint32_t length);
 	uint32_t dlcToLength(uint32_t dlc);
-
+	uint32_t _shdnPin;
 	FDCAN_RxHeaderTypeDef _rxHeader;
-	// uint8_t _rxData[8];
 };
 #endif

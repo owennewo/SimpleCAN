@@ -21,6 +21,13 @@ enum CanMode
     // CAN_LOOPBACK_EXTERNAL = 0x02U,  <-- some boards support this
 };
 
+enum CanErrorType
+{
+    CAN_ERROR_CLOCK = 0x03U,
+    CAN_ERROR_TIMING = 0x04U,
+    CAN_ERROR_BITRATE_TOO_HIGH = 0x05U,
+};
+
 enum CanStatus
 {
     CAN_OK = 0x00U,
@@ -61,7 +68,7 @@ public:
     BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN = NC);
 
     // setup methods
-    virtual CanStatus init(uint32_t bitrate = 1000000, CanMode mode = CAN_STANDARD) = 0;
+    virtual CanStatus init(CanMode mode = CAN_STANDARD, uint32_t bitrate = 250000) = 0;
     virtual CanStatus deinit() = 0;
     virtual CanStatus filter(FilterType filterType, uint32_t identifier = 0b11111111111, uint32_t mask = 0b11111111111, bool maskRtrBit = false, bool identifierRtrBit = false) = 0;
     virtual CanStatus start() = 0;
@@ -76,6 +83,7 @@ public:
 protected:
     virtual CanTiming solveCanTiming(uint32_t clockFreq, uint32_t bitrate);
     void logFrame(CanFrame *txFrame);
+    void failAndBlink(CanErrorType errorType);
     uint16_t _pinRX;
     uint16_t _pinTX;
     uint16_t _pinSHDN;

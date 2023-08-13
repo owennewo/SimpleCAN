@@ -3,37 +3,48 @@
 #include "can.h"
 #include <Arduino.h>
 
-void (*Can::receiveCallback)(CanFrame *rxMessage);
+void (*Can::receiveCallback)();
 CAN_HandleTypeDef *Can::_hcan;
-
-WEAK void SIMPLECAN_STM32_INIT(CAN_HandleTypeDef *hcan, uint32_t bitrate, CanMode mode);
 
 Can::Can(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : BaseCan(pinRX, pinTX, pinSHDN)
 {
-  // Much of this function is equivalent to HAL_CAN_MspInit but dynamic using PinMap
   PinName rx_name = static_cast<PinName>(pinRX);
   PinName tx_name = static_cast<PinName>(pinTX);
-  // PinName rx_name = digitalPinToPinName(static_cast<uint32_t>(pinRX));
-  // PinName tx_name = digitalPinToPinName(static_cast<uint32_t>(pinTX));
 
-  // these pin_functions enabe port clock and set correct alternative functions/speed
   pin_function(rx_name, pinmap_function(rx_name, PinMap_CAN_RD));
   pin_function(tx_name, pinmap_function(tx_name, PinMap_CAN_TD));
-
-  // if (pinSHDN != NC)
-  // {
-  //   pinMode(shdnPin, OUTPUT);
-  //   digitalWrite(shdnPin, HIGH);
-  // }
 }
 
-CanStatus Can::init(uint32_t bitrate, CanMode mode)
+CanStatus Can::init(CanMode mode, uint32_t bitrate)
 {
   _hcan = new CAN_HandleTypeDef(
       {.Instance = CAN1,
        .Init = {}});
 
-  SIMPLECAN_STM32_INIT(_hcan, bitrate, mode);
+  // this depends on how we set FdcanClockSelection
+  uint32_t clockFreq = HAL_RCC_GetPCLK1Freq(); // or use HAL_RCC_GetSysClockFreq();
+
+  // Looking for a timeQuanta of between 8 and 25.
+  // start at 16 and work outwards
+  // this algo is inspired by: http://www.bittiming.can-wiki.info/
+
+  CanTiming timing = solveCanTiming(clockFreq, bitrate);
+
+  CAN_InitTypeDef *init = &(_hcan->Init);
+
+  init->Prescaler = (uint16_t)timing.prescaler;
+  init->Mode = mode == CanMode::CAN_LOOPBACK ? CAN_MODE_LOOPBACK : CAN_MODE_NORMAL;
+  init->SyncJumpWidth = CAN_SJW_1TQ;
+  init->TimeSeg1 = (timing.tseg1 - 1) << CAN_BTR_TS1_Pos;
+  init->TimeSeg2 = (timing.tseg2 - 1) << CAN_BTR_TS2_Pos;
+  init->TimeTriggeredMode = DISABLE;
+  init->AutoBusOff = DISABLE;
+  init->AutoWakeUp = DISABLE;
+  init->AutoRetransmission = DISABLE;
+  init->ReceiveFifoLocked = DISABLE;
+  init->TransmitFifoPriority = DISABLE;
+
+  uint32_t solvedBitrate = (HAL_RCC_GetPCLK1Freq() / init->Prescaler) / (1 + timing.tseg1 + timing.tseg2);
 
   if (_hcan->Instance == CAN1)
   {
@@ -81,7 +92,7 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
   static uint32_t filterMaskLow = 0xffff;
   uint8_t filterIndex = 0;
 
-  if (filterType == FilterType::FILTER_MASK_STANDARD_ID)
+  if (filterType == FilterType::FILTER_MASK_STANDARD)
   {
     filterIdHigh = identifier << 5; // make room for IDE, RTR bits (+ 3 unused)
     filterMaskHigh = mask << 5;
@@ -91,14 +102,14 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
   //   filterIdLow = identifier << 5;
   //   filterMaskLow = mask << 5;
   // }
-  if (filterType == FilterType::FILTER_MASK_EXTENDED_ID)
+  if (filterType == FilterType::FILTER_MASK_EXTENDED)
   {
     filterIdLow = (identifier & 0x0000ffff) << 3; // make room for IDE, RTR bit (+ 1 unused bit)
     filterIdHigh = identifier >> 16;
     filterMaskLow = (mask & 0x0000ffff) << 3;
     filterMaskHigh = mask >> 16;
   }
-  else if (filterType == FilterType::FILTER_ACCEPT_ALL)
+  else if (filterType == FilterType::FILTER_ACCEPT_ALL_STANDARD || filterType == FilterType::FILTER_ACCEPT_ALL_EXTENDED)
   {
     filterIdLow = 0xffff;
     filterIdHigh = 0x0000; //<- no digits have to match
@@ -134,7 +145,7 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
       .FilterFIFOAssignment = CAN_FILTER_FIFO0,
       .FilterBank = filterIndex,
       .FilterMode = CAN_FILTERMODE_IDMASK,
-      .FilterScale = filterType == FilterType::FILTER_MASK_EXTENDED_ID ? CAN_FILTERSCALE_32BIT : CAN_FILTERSCALE_16BIT,
+      .FilterScale = filterType == FilterType::FILTER_MASK_EXTENDED ? CAN_FILTERSCALE_32BIT : CAN_FILTERSCALE_16BIT,
       .FilterActivation = filterType == FilterType::FILTER_DISABLE ? DISABLE : ENABLE,
   };
   return static_cast<CanStatus>(HAL_CAN_ConfigFilter(_hcan, &filter));
@@ -161,18 +172,7 @@ CanStatus Can::writeFrame(CanFrame *txFrame)
 
 #ifdef CAN_DEBUG
   Serial.print("tx: ");
-  Serial.print(txFrame->identifier, HEX);
-  Serial.print(" [");
-
-  // uint8_t length = dlcToLength(dataLength);
-  Serial.print(txFrame->dataLength);
-  Serial.print("] ");
-  for (uint32_t byte_index = 0; byte_index < txFrame->dataLength; byte_index++)
-  {
-    Serial.print(txFrame->data[byte_index], HEX);
-    Serial.print(" ");
-  }
-  Serial.println(status == HAL_OK ? "✅" : "❌");
+  logFrame(txFrame);
 #endif
 
   return status == HAL_OK ? CAN_OK : CAN_ERROR;
@@ -186,16 +186,10 @@ uint32_t Can::available()
 CanStatus Can::readFrame(CanFrame *rxMessage)
 {
 
-  return _readFrame(_hcan, rxMessage);
-}
-
-CanStatus Can::_readFrame(CAN_HandleTypeDef *hcan, CanFrame *rxMessage)
-{
-
   static uint8_t buffer[8] = {0};
   static CAN_RxHeaderTypeDef rxHeader;
 
-  CanStatus status = static_cast<CanStatus>(HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, buffer));
+  CanStatus status = static_cast<CanStatus>(HAL_CAN_GetRxMessage(_hcan, CAN_RX_FIFO0, &rxHeader, buffer));
   Serial.print("rx: ");
   if (status == CAN_OK)
   {
@@ -205,35 +199,18 @@ CanStatus Can::_readFrame(CAN_HandleTypeDef *hcan, CanFrame *rxMessage)
     rxMessage->isExtended = rxHeader.IDE == CAN_ID_STD ? false : true;
 
     memcpy(rxMessage->data, buffer, rxHeader.DLC);
-    Serial.print(rxMessage->identifier, HEX);
-    Serial.print(" [");
-
-    // uint8_t length = dlcToLength(dataLength);
-    Serial.print(rxMessage->dataLength);
-    Serial.print("] ");
-    for (uint32_t byte_index = 0; byte_index < rxMessage->dataLength; byte_index++)
-    {
-      Serial.print(buffer[byte_index], HEX);
-      Serial.print(" ");
-    }
-    Serial.println("✅");
-  }
-  else
-  {
-
-    Serial.println("❌");
-  }
 
 #ifdef CAN_DEBUG
-
+    logFrame(rxMessage);
 #endif
+  }
 
   return status;
 }
 
-CanStatus Can::subscribe(void (*_messageReceiveCallback)(CanFrame *rxMessage))
+CanStatus Can::subscribe(void (*_messageReceiveCallback)())
 {
-  receiveCallback = _messageReceiveCallback;
+  Can::receiveCallback = _messageReceiveCallback;
   return static_cast<CanStatus>(HAL_CAN_ActivateNotification(_hcan, CAN_IT_RX_FIFO0_MSG_PENDING));
 }
 
@@ -244,120 +221,30 @@ CanStatus Can::unsubscribe()
 
 void Can::_messageReceive()
 {
+
   if (Can::receiveCallback != nullptr)
   {
-    CanFrame rxMessage;
-    if (Can::_readFrame(_hcan, &rxMessage) == CAN_OK)
-    {
-      Can::receiveCallback(&rxMessage);
-    }
+    Serial.print("+");
+    // CanFrame rxMessage;
+    // if (Can::_readFrame(_hcan, &rxMessage) == CAN_OK)
+    // {
+    //   Can::receiveCallback(&rxMessage);
+    // }
   }
-}
-
-void SIMPLECAN_STM32_INIT(CAN_HandleTypeDef *hcan, uint32_t bitrate, CanMode mode)
-{
-  // this depends on how we set FdcanClockSelection
-  uint32_t clockFreq = HAL_RCC_GetPCLK1Freq(); // or use HAL_RCC_GetSysClockFreq();
-
-  // Looking for a timeQuanta of between 8 and 25.
-  // start at 16 and work outwards
-  // this algo is inspired by: http://www.bittiming.can-wiki.info/
-
-  uint32_t baseQuanta = 16;
-  uint32_t timeQuanta = baseQuanta;
-
-  uint32_t offset = 0;
-  bool found = false;
-
-  while (offset <= 9)
-  {
-    timeQuanta = baseQuanta - offset;
-    if (clockFreq % (bitrate * timeQuanta) == 0)
-    {
-      found = true;
-      break;
-    }
-    timeQuanta = baseQuanta + offset;
-    if (clockFreq % (bitrate * timeQuanta) == 0)
-    {
-      found = true;
-      break;
-    }
-    offset += 1;
-  }
-  if (!found)
-  {
-#ifdef CAN_DEBUG
-    Serial.println("timeQuanta out of range");
-#endif
-    Error_Handler();
-  }
-
-  uint32_t prescaler = clockFreq / (bitrate * timeQuanta);
-
-  uint32_t nominalTimeSeg1 = uint32_t(0.875 * timeQuanta) - 1;
-
-  float samplePoint = (1.0 + nominalTimeSeg1) / timeQuanta;
-  float samplePoint2 = (1.0 + nominalTimeSeg1 + 1) / timeQuanta;
-
-  if (abs(samplePoint2 - 0.875) < abs(samplePoint - 0.875))
-  {
-    nominalTimeSeg1 += 1;
-    samplePoint = samplePoint2;
-  }
-
-  uint32_t nominalTimeSeg2 = timeQuanta - nominalTimeSeg1 - 1;
-
-  CAN_InitTypeDef *init = &(hcan->Init);
-
-  init->Prescaler = (uint16_t)prescaler;
-  init->Mode = mode == CanMode::CAN_LOOPBACK ? CAN_MODE_LOOPBACK : CAN_MODE_NORMAL;
-  init->SyncJumpWidth = CAN_SJW_1TQ;
-  init->TimeSeg1 = (nominalTimeSeg1 - 1) << CAN_BTR_TS1_Pos;
-  init->TimeSeg2 = (nominalTimeSeg2 - 1) << CAN_BTR_TS2_Pos;
-  init->TimeTriggeredMode = DISABLE;
-  init->AutoBusOff = DISABLE;
-  init->AutoWakeUp = DISABLE;
-  init->AutoRetransmission = DISABLE;
-  init->ReceiveFifoLocked = DISABLE;
-  init->TransmitFifoPriority = DISABLE;
-
-#ifdef CAN_DEBUG
-
-  uint32_t solvedBitrate = (HAL_RCC_GetPCLK1Freq() / init->Prescaler) / (1 + nominalTimeSeg1 + nominalTimeSeg2);
-
-  Serial.println("###### TIMINGS ######");
-  Serial.print("target bitrate:");
-  Serial.print(bitrate);
-  Serial.print(" (coreFreq:");
-  Serial.print(HAL_RCC_GetSysClockFreq());
-  Serial.print(", PCLK1: ");
-  Serial.print(HAL_RCC_GetPCLK1Freq());
-  Serial.println(")");
-
-  Serial.print("solution bitrate:");
-  Serial.print(bitrate);
-  Serial.print(" (prescaler:");
-  Serial.print(prescaler);
-  Serial.print(", timeQuanta:");
-  Serial.print(timeQuanta);
-  Serial.print(", nominalTimeSeg1:");
-  Serial.print(nominalTimeSeg1);
-  Serial.print(", nominalTimeSeg2:");
-  Serial.print(nominalTimeSeg2);
-  Serial.print(", samplePoint:");
-  Serial.print(samplePoint);
-  Serial.println(")");
-#endif
 }
 
 extern "C" void CAN1_RX0_IRQHandler(void)
 {
+  Serial.print("+");
+  Serial.flush();
+
   HAL_CAN_IRQHandler(Can::_hcan);
 }
 
 extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
+  Serial.print("+");
+  Serial.flush();
   Can::_messageReceive();
 }
 #endif
