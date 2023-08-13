@@ -8,7 +8,7 @@ BaseCan::BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : _pinRX(pinR
     }
 }
 
-CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate)
+CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier)
 {
     // this algo is inspired by: http://www.bittiming.can-wiki.info/
     CanTiming timing = {};
@@ -23,13 +23,13 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate)
     {
         // Looking for a timeQuanta of between 8 and 25.
         timeQuanta = baseQuanta - offset;
-        if (clockFreq % (bitrate * timeQuanta) == 0)
+        if (clockFreq % (bitrate * timeQuanta * multiplier) == 0)
         {
             found = true;
             break;
         }
         timeQuanta = baseQuanta + offset;
-        if (clockFreq % (bitrate * timeQuanta) == 0)
+        if (clockFreq % (bitrate * timeQuanta * multiplier) == 0)
         {
             found = true;
             break;

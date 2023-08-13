@@ -40,8 +40,7 @@ enum FilterType
     FILTER_DISABLE = 0x00U,
     FILTER_MASK_STANDARD = 0x01U,
     FILTER_MASK_EXTENDED = 0x02U,
-    FILTER_ACCEPT_ALL_STANDARD = 0x03U,
-    FILTER_ACCEPT_ALL_EXTENDED = 0x04U
+    FILTER_ACCEPT_ALL = 0x03U,
 };
 
 struct CanFrame
@@ -81,7 +80,7 @@ public:
     virtual CanStatus readFrame(CanFrame *rxMessage) = 0;
 
 protected:
-    virtual CanTiming solveCanTiming(uint32_t clockFreq, uint32_t bitrate);
+    virtual CanTiming solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier = 1);
     void logFrame(CanFrame *txFrame);
     void failAndBlink(CanErrorType errorType);
     uint16_t _pinRX;

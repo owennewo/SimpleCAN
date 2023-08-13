@@ -91,20 +91,12 @@ void test_loopback_write_then_read(Can *can, uint8_t testIndex, uint32_t identif
 
 void test_filter(uint8_t testIndex, uint32_t acceptance_code, uint32_t mask, uint32_t identifier, bool isExtended, bool maskRtrBit, bool filterRtrBit, bool isRtrFrame, bool expectPass)
 {
-#if defined(ARDUINO_ARCH_ESP32)
-    Can can(GPIO_NUM_4, GPIO_NUM_5);
-#elif defined(HAL_CAN_MODULE_ENABLED)
-    Can can(PB_8, PB_9, NC);
-#elif defined(HAL_FDCAN_MODULE_ENABLED)
-    Can can(PA_11, PB_9, PB_4);
-#else
-#error "No CAN module is enabled, expecting a define for ARDUINO_ARCH_ESP32 | HAL_CAN_MODULE_ENABLED | HAL_FDCAN_MODULE_ENABLED"
-#endif
+    Can can(CAN_RX, CAN_TX);
 
     FilterType filterType = isExtended ? FILTER_MASK_EXTENDED : FILTER_MASK_STANDARD;
 
-    can.init(CanMode::CAN_LOOPBACK, 500000);
     can.filter(filterType, acceptance_code, mask, maskRtrBit, filterRtrBit);
+    can.init(CanMode::CAN_LOOPBACK, 250000);
 
     can.start();
     delay(10);
