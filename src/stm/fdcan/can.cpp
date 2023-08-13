@@ -9,31 +9,24 @@ extern "C" void FDCAN1_IT0_IRQHandler();
 #endif
 extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs);
 
-FDCAN_RxHeaderTypeDef _rxHeader{};
-FDCAN_HandleTypeDef Can::_hfdcan1 = {};
-
 void (*Can::_callbackFunction)() = nullptr;
+FDCAN_RxHeaderTypeDef _rxHeader = {};
+FDCAN_HandleTypeDef Can::_hcan = {};
 
-Can::Can(uint16_t rxPin, uint16_t txPin, uint16_t shdnPin) : BaseCan(rxPin, txPin, shdnPin)
+Can::Can(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : BaseCan(pinRX, pinTX, pinSHDN)
 {
-  PinName rx_name = static_cast<PinName>(rxPin);
-  PinName tx_name = static_cast<PinName>(txPin);
+  PinName rx_name = static_cast<PinName>(pinRX);
+  PinName tx_name = static_cast<PinName>(pinTX);
 
   pin_function(rx_name, pinmap_function(rx_name, PinMap_CAN_RD));
   pin_function(tx_name, pinmap_function(tx_name, PinMap_CAN_TD));
 
-  Can::_shdnPin = shdnPin;
-  _hfdcan1.Instance = FDCAN1;
-
-  if (shdnPin != NC)
-  {
-    pinMode(shdnPin, OUTPUT);
-  }
+  Can::_pinSHDN = pinSHDN;
+  _hcan.Instance = FDCAN1;
 }
 
 CanStatus Can::init(CanMode mode, uint32_t bitrate)
 {
-
   if (bitrate > 1000000)
   {
     failAndBlink(CAN_ERROR_BITRATE_TOO_HIGH);
@@ -58,7 +51,7 @@ CanStatus Can::init(CanMode mode, uint32_t bitrate)
   uint32_t clockFreq = HAL_RCC_GetPCLK1Freq(); // or use HAL_RCC_GetSysClockFreq();
 
   CanTiming timing = solveCanTiming(clockFreq, bitrate);
-  FDCAN_InitTypeDef *init = &(_hfdcan1.Init);
+  FDCAN_InitTypeDef *init = &(_hcan.Init);
 
   init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster FDCAN_FRAME_FD_BRS;
   init->Mode = mode == CAN_LOOPBACK ? FDCAN_MODE_INTERNAL_LOOPBACK : FDCAN_MODE_NORMAL;
@@ -96,62 +89,12 @@ CanStatus Can::init(CanMode mode, uint32_t bitrate)
   init->TxElmtSize = FDCAN_DATA_BYTES_8;
 #endif
 
-  Serial.println("init2");
-  if (HAL_FDCAN_Init(&_hfdcan1) != HAL_OK)
-  {
-#ifdef CAN_DEBUG
-    Serial.println("CAN init failed");
-#endif
-    return CAN_ERROR;
-  }
-
-  return CAN_OK;
+  return (HAL_FDCAN_Init(&_hcan) == HAL_OK) ? CAN_OK : CAN_ERROR;
 }
 
 CanStatus Can::deinit()
 {
-  return HAL_FDCAN_DeInit(&_hfdcan1) == HAL_OK ? CAN_OK : CAN_ERROR;
-}
-
-CanStatus Can::writeFrame(CanFrame *txFrame)
-{
-#ifdef CAN_DEBUG
-  Serial.print("tx >> ");
-  logFrame(txFrame);
-#endif
-
-  FDCAN_TxHeaderTypeDef TxHeader = {
-      .Identifier = txFrame->identifier,
-      .IdType = txFrame->isExtended ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
-      .TxFrameType = txFrame->isRTR ? FDCAN_REMOTE_FRAME : FDCAN_DATA_FRAME,
-      .DataLength = lengthToDLC(txFrame->dataLength),
-      .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
-      .BitRateSwitch = FDCAN_BRS_OFF,
-      .FDFormat = FDCAN_CLASSIC_CAN,
-      .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
-      .MessageMarker = 0};
-
-  HAL_StatusTypeDef status = HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan1, &TxHeader, txFrame->data);
-
-  return status == HAL_OK ? CAN_OK : CAN_ERROR;
-}
-
-CanStatus Can::start(void)
-{
-  if (Can::_shdnPin != NC)
-  {
-    digitalWrite(Can::_shdnPin, LOW);
-  }
-  return HAL_FDCAN_Start(&_hfdcan1) == HAL_OK ? CAN_OK : CAN_ERROR;
-}
-
-CanStatus Can::stop(void)
-{
-  if (Can::_shdnPin != NC)
-  {
-    digitalWrite(Can::_shdnPin, HIGH);
-  }
-  return HAL_FDCAN_Stop(&_hfdcan1) == HAL_OK ? CAN_OK : CAN_ERROR;
+  return HAL_FDCAN_DeInit(&_hcan) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
 CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask, bool maskRtrBit, bool identifierRtrBit)
@@ -160,19 +103,19 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
   switch (filterType)
   {
   case FILTER_DISABLE:
-    return (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
   case FILTER_ACCEPT_ALL_STANDARD:
-    return (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
   case FILTER_ACCEPT_ALL_EXTENDED:
-    return (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
+    return (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) == HAL_OK) ? CAN_OK : CAN_ERROR;
   case FILTER_MASK_STANDARD:
-    if (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK)
+    if (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK)
     {
       return CAN_ERROR;
     }
     break;
   case FILTER_MASK_EXTENDED:
-    if (HAL_FDCAN_ConfigGlobalFilter(&_hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK)
+    if (HAL_FDCAN_ConfigGlobalFilter(&_hcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK)
     {
       return CAN_ERROR;
     }
@@ -189,22 +132,95 @@ CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask,
       .FilterID1 = identifier,
       .FilterID2 = mask};
 
-  return HAL_FDCAN_ConfigFilter(&_hfdcan1, &filter) == HAL_OK ? CAN_OK : CAN_ERROR;
+  return HAL_FDCAN_ConfigFilter(&_hcan, &filter) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
-CanStatus Can::subscribe(void (*onReceive)())
+CanStatus Can::subscribe(void (*_messageReceiveCallback)())
 {
-  Can::_callbackFunction = onReceive;
-
-  return HAL_FDCAN_ActivateNotification(&_hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) == HAL_OK ? CAN_OK : CAN_ERROR;
+  Can::_callbackFunction = _messageReceiveCallback;
+  return HAL_FDCAN_ActivateNotification(&_hcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
 CanStatus Can::unsubscribe()
 {
   Can::_callbackFunction = nullptr;
-  return HAL_FDCAN_DeactivateNotification(&_hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == HAL_OK ? CAN_OK : CAN_ERROR;
+  return HAL_FDCAN_DeactivateNotification(&_hcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == HAL_OK ? CAN_OK : CAN_ERROR;
 }
 
+CanStatus Can::start(void)
+{
+  if (_pinSHDN != NC)
+  {
+    digitalWrite(_pinSHDN, LOW);
+  }
+  return HAL_FDCAN_Start(&_hcan) == HAL_OK ? CAN_OK : CAN_ERROR;
+}
+
+CanStatus Can::stop(void)
+{
+  if (_pinSHDN != NC)
+  {
+    digitalWrite(_pinSHDN, HIGH);
+  }
+  return HAL_FDCAN_Stop(&_hcan) == HAL_OK ? CAN_OK : CAN_ERROR;
+}
+
+CanStatus Can::writeFrame(CanFrame *txFrame)
+{
+#ifdef CAN_DEBUG
+  Serial.print("tx >> ");
+  logFrame(txFrame);
+#endif
+
+  _txHeader = {
+      .Identifier = txFrame->identifier,
+      .IdType = txFrame->isExtended ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID,
+      .TxFrameType = txFrame->isRTR ? FDCAN_REMOTE_FRAME : FDCAN_DATA_FRAME,
+      .DataLength = lengthToDLC(txFrame->dataLength),
+      .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
+      .BitRateSwitch = FDCAN_BRS_OFF,
+      .FDFormat = FDCAN_CLASSIC_CAN,
+      .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
+      .MessageMarker = 0};
+
+  return HAL_FDCAN_AddMessageToTxFifoQ(&_hcan, &_txHeader, txFrame->data) == HAL_OK ? CAN_OK : CAN_ERROR;
+}
+
+CanStatus Can::readFrame(CanFrame *rxFrame)
+{
+  memset(&_rxHeader, 0, sizeof(_rxHeader)); // <-zero before reusing _rxHeader
+
+  if (HAL_FDCAN_GetRxMessage(&_hcan, FDCAN_RX_FIFO0, &_rxHeader, rxFrame->data) != HAL_OK)
+  {
+    Serial.println("HAL_FDCAN_GetRxMessage failed");
+    return CAN_ERROR;
+  }
+  else
+  {
+    rxFrame->identifier = _rxHeader.Identifier;
+    rxFrame->isRTR = _rxHeader.RxFrameType == FDCAN_REMOTE_FRAME;
+    rxFrame->isExtended = _rxHeader.IdType == FDCAN_EXTENDED_ID;
+    rxFrame->dataLength = dlcToLength(_rxHeader.DataLength);
+
+#ifdef CAN_DEBUG
+    Serial.print("rx << ");
+    logFrame(rxFrame);
+#endif
+
+    return CAN_OK;
+  }
+}
+
+uint32_t Can::available()
+{
+  return HAL_FDCAN_GetRxFifoFillLevel(&_hcan, FDCAN_RX_FIFO0);
+}
+
+/*
+#####################
+HAL CALBACK FUNCTIONS
+#####################
+*/
 void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan)
 {
   __HAL_RCC_FDCAN_CLK_ENABLE(); //<- this has to be enabled in this init callback
@@ -214,7 +230,7 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan)
 
 void FDCAN1_IT0_IRQHandler(void)
 {
-  HAL_FDCAN_IRQHandler(&Can::_hfdcan1);
+  HAL_FDCAN_IRQHandler(&Can::_hcan);
 }
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
@@ -229,34 +245,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
   }
 }
 
-uint32_t Can::available()
-{
-  return HAL_FDCAN_GetRxFifoFillLevel(&_hfdcan1, FDCAN_RX_FIFO0);
-}
-
-CanStatus Can::readFrame(CanFrame *rxFrame)
-{
-
-  if (HAL_FDCAN_GetRxMessage(&_hfdcan1, FDCAN_RX_FIFO0, &_rxHeader, rxFrame->data) != HAL_OK)
-  {
-    return CAN_ERROR;
-  }
-  else
-  {
-    rxFrame->identifier = _rxHeader.Identifier;
-    rxFrame->isRTR = _rxHeader.RxFrameType == FDCAN_REMOTE_FRAME;
-    rxFrame->dataLength = dlcToLength(_rxHeader.DataLength);
-    rxFrame->isExtended = _rxHeader.IdType == FDCAN_EXTENDED_ID;
-
-#ifdef CAN_DEBUG
-    Serial.print("rx << ");
-    logFrame(rxFrame);
-#endif
-
-    return CAN_OK;
-  }
-}
-
+/*
+##########
+HELPERS
+##########
+*/
 uint32_t Can::dlcToLength(uint32_t dlc)
 {
   switch (dlc)

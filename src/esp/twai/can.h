@@ -33,8 +33,6 @@ public:
 private:
     CanStatus writeFrame(uint32_t identifier, bool isRTR, uint32_t dataLength, uint8_t data[]);
 
-    uint8_t *_rxData;
-
     twai_general_config_t _general_config;
     twai_timing_config_t _timing_config;
     twai_filter_config_t _filter_config;

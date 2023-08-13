@@ -39,8 +39,8 @@ And this will produce a flow chart:
 
 ```mermaid
 graph LR
-base_can[Square Rect] -- Link text --> stm/can((Circle))
-base_can --> stm/fdcan(Round Rect)
-base_can --> esp/twai/{Rhombus}
+base[base_can] --> stm_can((stm/can.h))
+base --> stm_fdcan((stm/fdcan/can.h))
+base --> esp_twai((esp/twai/can.h))
 
 ```

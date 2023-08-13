@@ -10,20 +10,18 @@ BaseCan::BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : _pinRX(pinR
 
 CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate)
 {
-
-    CanTiming timing = {};
-    // Looking for a timeQuanta of between 8 and 25.
-    // start at 16 and work outwards
     // this algo is inspired by: http://www.bittiming.can-wiki.info/
-
+    CanTiming timing = {};
     uint32_t baseQuanta = 16;
     uint32_t timeQuanta = baseQuanta;
 
     uint32_t offset = 0;
     bool found = false;
 
+    // start at 16 and work outwards
     while (offset <= 9)
     {
+        // Looking for a timeQuanta of between 8 and 25.
         timeQuanta = baseQuanta - offset;
         if (clockFreq % (bitrate * timeQuanta) == 0)
         {
@@ -86,10 +84,17 @@ void BaseCan::logFrame(CanFrame *frame)
     // uint8_t length = dlcToLength(dataLength);
     Serial.print(frame->dataLength);
     Serial.print("] ");
-    for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
+    if (frame->isRTR)
     {
-        Serial.print(frame->data[byte_index], HEX);
-        Serial.print(" ");
+        Serial.print("R");
+    }
+    else
+    {
+        for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
+        {
+            Serial.print(frame->data[byte_index], HEX);
+            Serial.print(" ");
+        }
     }
     Serial.println();
 }
