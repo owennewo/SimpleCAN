@@ -10,7 +10,9 @@ By true, I mean that you could build Messages on this that would work across esp
 |--|--|--|--|--|--|--|
 | stm | G4 | fdcan | std, ext | polling ✅<br> irq ✅  | compiles, manual loopback tested, unit tested |  |
 | stm | H7| fdcan | std, ext| polling ✅<br> irq ❌ | compiles, manual loopback tested, unit tested | stm | fdcan | L0 | | ? | | |
-| stm | G0 | fdcan |  | | ? | | | 
+| stm | f4 | can2b | std, ext | ✅<br> irq ✅ | f405, f407 tested | | |
+| stm | f1 | can2b | std, ext | ?| not tested | | |
+| stm | l1 | can2b | std, ext | ? | not tested | | |
 | esp | esp32S |twai |  | | was working (refactoring) | | | 
 | arduino | R4 | ? |  | | not started | | | 
 
