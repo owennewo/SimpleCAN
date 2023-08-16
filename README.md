@@ -34,5 +34,14 @@ graph LR
 base[base_can] --> stm_can((stm/can.h))
 base --> stm_fdcan((stm/fdcan/can.h))
 base --> esp_twai((esp/twai/can.h))
+stm_can --> stm32f1
+stm_can --> stm32f4
+stm_can --> stm32l1
+stm_can --> stm32g0
+stm_fdcan --> stm32g4
+stm_fdcan --> stm32h7
+esp_twai --> esp
+esp_twai --> esp s2
+esp_twai --> esp s3
 
 ```
