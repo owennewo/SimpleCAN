@@ -10,7 +10,7 @@
 #define WEAK __attribute__((weak))
 #endif
 
-class Can : BaseCan
+class Can : public BaseCan
 {
 
 public:
@@ -28,19 +28,22 @@ public:
 
     CanStatus writeFrame(CanFrame *txFrame) override;
     CanStatus readFrame(CanFrame *rxFrame) override;
-    // available not possible on ESP32, but read does return CAN_NO_DATA if no data is available
+    uint32_t available() override;
 
     static void _messageReceive();
     static void (*receiveCallback)(CanFrame *rxMessage);
+    static uint16_t _pinRX;
+    static uint16_t _pinTX;
+    static uint16_t _pinSHDN;
 
 private:
     twai_general_config_t _general_config;
     twai_timing_config_t _timing_config;
     twai_filter_config_t _filter_config;
-
     twai_message_t _rxEspFrame;
     twai_message_t _txEspFrame;
-
+    twai_status_info_t _statusInfo;
     CanMode _mode;
+    CanStatus logStatus(char op, esp_err_t status);
 };
 #endif

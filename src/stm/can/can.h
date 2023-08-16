@@ -23,15 +23,20 @@ public:
 
 	CanStatus writeFrame(CanFrame *txFrame) override;
 	CanStatus readFrame(CanFrame *rxFrame) override;
-	uint32_t available();
+	uint32_t available() override;
 
 	static CAN_HandleTypeDef _hcan;
 	static void (*_callbackFunction)();
 	// static void _messageReceive();
 
+	static uint16_t _pinRX;
+	static uint16_t _pinTX;
+	static uint16_t _pinSHDN;
+
 private:
 	CAN_RxHeaderTypeDef _rxHeader;
 	CAN_TxHeaderTypeDef _txHeader;
+	CanStatus logStatus(char op, HAL_StatusTypeDef status);
 };
 
 #endif

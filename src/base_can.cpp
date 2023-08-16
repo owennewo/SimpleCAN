@@ -1,11 +1,12 @@
 #include "base_can.h"
 
-BaseCan::BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : _pinRX(pinRX), _pinTX(pinTX), _pinSHDN(pinSHDN)
+BaseCan::BaseCan()
 {
-    if (pinSHDN != NC)
-    {
-        pinMode(pinSHDN, OUTPUT);
-    }
+    // if (pinSHDN != NC)
+    // {
+    //     pinMode(pinSHDN, OUTPUT);
+    // }
+    _Serial = &Serial;
 }
 
 CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier)
@@ -57,20 +58,20 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
 
     timing.tseg2 = timeQuanta - timing.tseg1 - 1;
 #ifdef CAN_DEBUG
-    Serial.print("clockFreq:");
-    Serial.print(clockFreq);
-    Serial.print(", bitrate:");
-    Serial.print(bitrate);
-    Serial.print(", prescaler:");
-    Serial.print(timing.prescaler);
-    Serial.print(", timeQuanta:");
-    Serial.print(timeQuanta);
-    Serial.print(", nominalTimeSeg1:");
-    Serial.print(timing.tseg1);
-    Serial.print(", nominalTimeSeg2:");
-    Serial.print(timing.tseg2);
-    Serial.print(", samplePoint:");
-    Serial.println(samplePoint);
+    _Serial->print("clockFreq:");
+    _Serial->print(clockFreq);
+    _Serial->print(", bitrate:");
+    _Serial->print(bitrate);
+    _Serial->print(", prescaler:");
+    _Serial->print(timing.prescaler);
+    _Serial->print(", timeQuanta:");
+    _Serial->print(timeQuanta);
+    _Serial->print(", nominalTimeSeg1:");
+    _Serial->print(timing.tseg1);
+    _Serial->print(", nominalTimeSeg2:");
+    _Serial->print(timing.tseg2);
+    _Serial->print(", samplePoint:");
+    _Serial->println(samplePoint);
 
 #endif
     return timing;
@@ -78,32 +79,32 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
 
 void BaseCan::logFrame(CanFrame *frame)
 {
-    Serial.print(frame->identifier, HEX);
-    Serial.print(" [");
+    _Serial->print(frame->identifier, HEX);
+    _Serial->print(" [");
 
     // uint8_t length = dlcToLength(dataLength);
-    Serial.print(frame->dataLength);
-    Serial.print("] ");
+    _Serial->print(frame->dataLength);
+    _Serial->print("] ");
     if (frame->isRTR)
     {
-        Serial.print("R");
+        _Serial->print("R");
     }
     else
     {
         for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
         {
-            Serial.print(frame->data[byte_index], HEX);
-            Serial.print(" ");
+            _Serial->print(frame->data[byte_index], HEX);
+            _Serial->print(" ");
         }
     }
-    Serial.println();
+    _Serial->println();
 }
 
 void BaseCan::failAndBlink(CanErrorType errorType)
 {
 #ifdef CAN_DEBUG
-    Serial.print("fatal error: ");
-    Serial.println(errorType, HEX);
+    _Serial->print("fatal error: ");
+    _Serial->println(errorType, HEX);
 #endif
     while (1)
     {
@@ -116,4 +117,9 @@ void BaseCan::failAndBlink(CanErrorType errorType)
         }
         delay(1000);
     }
+}
+
+void BaseCan::logTo(Stream *serial)
+{
+    _Serial = serial;
 }

@@ -64,7 +64,7 @@ class BaseCan
 {
 
 public:
-    BaseCan(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN = NC);
+    BaseCan();
 
     // setup methods
     virtual CanStatus init(CanMode mode = CAN_STANDARD, uint32_t bitrate = 250000) = 0;
@@ -77,13 +77,14 @@ public:
     virtual CanStatus writeFrame(CanFrame *txFrame) = 0;
 
     // rx methods
+    virtual uint32_t available() = 0;
     virtual CanStatus readFrame(CanFrame *rxMessage) = 0;
+
+    void logTo(Stream *serial);
 
 protected:
     virtual CanTiming solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier = 1);
     void logFrame(CanFrame *txFrame);
     void failAndBlink(CanErrorType errorType);
-    uint16_t _pinRX;
-    uint16_t _pinTX;
-    uint16_t _pinSHDN;
+    Stream *_Serial;
 };

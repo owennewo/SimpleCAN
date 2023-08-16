@@ -23,16 +23,19 @@ public:
 
 	CanStatus writeFrame(CanFrame *txFrame) override;
 	CanStatus readFrame(CanFrame *rxMessage) override;
-	uint32_t available();
+	uint32_t available() override;
 
 	static FDCAN_HandleTypeDef _hcan;
 	static void (*_callbackFunction)();
+	static uint16_t _pinRX;
+	static uint16_t _pinTX;
+	static uint16_t _pinSHDN;
 
 private:
-	// WEAK void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *hfdcan);
 	uint32_t lengthToDLC(uint32_t length);
 	uint32_t dlcToLength(uint32_t dlc);
 	FDCAN_RxHeaderTypeDef _rxHeader;
 	FDCAN_TxHeaderTypeDef _txHeader;
+	CanStatus logStatus(char op, HAL_StatusTypeDef status);
 };
 #endif
