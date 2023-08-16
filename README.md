@@ -1,16 +1,9 @@
-# Welcome to StackEdit!
+# SimpleCAN (CanBus Library for Arduino)
 
-# SimpleCAN (for STM32DUINO)
-
-  
 
 This is aims to be a true Hardware Abstraction across multiple vendor/series.
 
-
 By true, I mean that you could build Messages on this that would work across esp32, stm can2b, stm fdcan. Same API, different hardware.
-|  |  |
-|--|--|
-|  |  |
 
   
 | vendor | API | series  | variant/board | tx | rx | status |
@@ -20,9 +13,6 @@ By true, I mean that you could build Messages on this that would work across esp
 | stm | G0 | fdcan |  | | ? | | | 
 | esp | esp32S |twai |  | | was working (refactoring) | | | 
 | arduino | R4 | ? |  | | not started | | | 
-
-
-
 
 
 
