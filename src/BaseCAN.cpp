@@ -1,15 +1,33 @@
-#include "base_can.h"
+#include "BaseCAN.h"
 
-BaseCan::BaseCan()
+BaseCAN::BaseCAN()
 {
     // if (pinSHDN != NC)
     // {
     //     pinMode(pinSHDN, OUTPUT);
     // }
     _Serial = &Serial;
+    mode = CAN_STANDARD;
 }
 
-CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier)
+bool BaseCAN::begin(int can_bitrate)
+{
+    return begin(static_cast<CanBitRate>(can_bitrate));
+}
+
+int BaseCAN::enableInternalLoopback()
+{
+    BaseCAN::mode = CAN_LOOPBACK;
+    return 1;
+}
+
+int BaseCAN::disableInternalLoopback()
+{
+    BaseCAN::mode = CAN_STANDARD;
+    return 1;
+}
+
+CanTiming BaseCAN::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier)
 {
     // this algo is inspired by: http://www.bittiming.can-wiki.info/
     CanTiming timing = {};
@@ -70,37 +88,38 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
     _Serial->print(timing.tseg1);
     _Serial->print(", nominalTimeSeg2:");
     _Serial->print(timing.tseg2);
-    _Serial->print(", samplePoint:");
-    _Serial->println(samplePoint);
+    // _Serial->print(", samplePoint:");
+    // _Serial->println(samplePoint);
 
 #endif
     return timing;
 }
 
-void BaseCan::logFrame(CanFrame *frame)
+void BaseCAN::logMessage(CanMsg const *msg)
 {
-    _Serial->print(frame->identifier, HEX);
-    _Serial->print(" [");
+    msg->printTo(*_Serial);
+    // _Serial->print(frame->identifier, HEX);
+    // _Serial->print(" [");
 
-    // uint8_t length = dlcToLength(dataLength);
-    _Serial->print(frame->dataLength);
-    _Serial->print("] ");
-    if (frame->isRTR)
-    {
-        _Serial->print("R");
-    }
-    else
-    {
-        for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
-        {
-            _Serial->print(frame->data[byte_index], HEX);
-            _Serial->print(" ");
-        }
-    }
-    _Serial->println();
+    // // uint8_t length = dlcToLength(dataLength);
+    // _Serial->print(frame->dataLength);
+    // _Serial->print("] ");
+    // if (frame->isRTR)
+    // {
+    //     _Serial->print("R");
+    // }
+    // else
+    // {
+    //     for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
+    //     {
+    //         _Serial->print(frame->data[byte_index], HEX);
+    //         _Serial->print(" ");
+    //     }
+    // }
+    // _Serial->println();
 }
 
-void BaseCan::failAndBlink(CanErrorType errorType)
+void BaseCAN::failAndBlink(CanErrorType errorType)
 {
 #ifdef CAN_DEBUG
     _Serial->print("fatal error: ");
@@ -119,7 +138,7 @@ void BaseCan::failAndBlink(CanErrorType errorType)
     }
 }
 
-void BaseCan::logTo(Stream *serial)
+void BaseCAN::logTo(Stream *serial)
 {
     _Serial = serial;
 }

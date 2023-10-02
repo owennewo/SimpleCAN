@@ -1,17 +1,18 @@
 
 #include <Arduino.h>
-#include "simplecan.h"
+#include "SimpleCAN.h"
 
 #include <unity.h>
 
 #include "../helper.h"
 
 bool isExtendedFrame = false;
+
+uint32_t acceptance_mask = 0b11111110010;
+uint32_t acceptance_code = 0b10110100000;
 uint32_t frame______same = 0b10110100000;
 uint32_t frame_____match = 0b10110100001;
 uint32_t frame_no__match = 0b11110100001;
-uint32_t acceptance_code = 0b10110100000;
-uint32_t acceptance_mask = 0b11111110010;
 
 void setup()
 {
@@ -19,39 +20,40 @@ void setup()
 
     UNITY_BEGIN();
     // frame identifier identical filter
-    RUN_TEST(test_data_frame_identical_identifier_ignore_rtr_bit);
-    RUN_TEST(test_data_frame_identical_identifier_rtr_bit_is_data_for_filter_and_frame);
+    RUN_TEST(data_frame_same_id_filter_any);
+    RUN_TEST(data_frame_same_id_filter_data);
 #if defined(ARDUINO_ARCH_ESP32)
-    RUN_TEST(test_data_frame_identical_identifier_rtr_bit_not_matching);
+    RUN_TEST(data_frame_same_id_filter_remote);
 #endif
-    RUN_TEST(test_remote_frame_identical_identifier_ignore_rtr_bit);
-    RUN_TEST(test_remote_frame_identical_identifier_rtr_bit_is_remote_for_filter_and_frame);
+    RUN_TEST(remote_frame_same_id_filter_any);
+    RUN_TEST(remote_frame_same_id_filter_remote);
 #if defined(ARDUINO_ARCH_ESP32)
-    RUN_TEST(test_remote_frame_identical_identifier_rtr_bit_not_matching);
+    RUN_TEST(remote_frame_same_id_filter_data);
 #endif
     // frame identifier matches filter
-    RUN_TEST(test_data_frame_matches_identifier_ignore_rtr_bit);
-    RUN_TEST(test_data_frame_matches_identifier_rtr_bit_is_data_for_filter_and_frame);
+    RUN_TEST(data_frame_matches_id_filter_both);
+    RUN_TEST(data_frame_matches_id_filter_data);
 #if defined(ARDUINO_ARCH_ESP32)
-    RUN_TEST(test_data_frame_matches_identifier_rtr_bit_not_matching);
+    RUN_TEST(data_frame_matches_id_filter_remote);
 #endif
-    RUN_TEST(test_remote_frame_matches_identifier_ignore_rtr_bit);
-    RUN_TEST(test_remote_frame_matches_identifier_rtr_bit_is_remote_for_filter_and_frame);
+    RUN_TEST(remote_frame_matches_id_filter_both);
+    RUN_TEST(remote_frame_matches_id_filter_remote);
 #if defined(ARDUINO_ARCH_ESP32)
-    RUN_TEST(test_remote_frame_matches_identifier_rtr_bit_not_matching);
+    RUN_TEST(remote_frame_matches_id_filter_data);
 #endif
 
     // frame identifier matches filter
-    RUN_TEST(test_data_frame_no_match_identifier_ignore_rtr_bit);
-    RUN_TEST(test_data_frame_no_match_identifier_rtr_bit_is_data_for_filter_and_frame);
+    RUN_TEST(data_frame_no_match_id_filter_both);
+    RUN_TEST(data_frame_no_match_id_filter_data);
 #if defined(ARDUINO_ARCH_ESP32)
-    RUN_TEST(test_data_frame_no_match_identifier_rtr_bit_not_matching);
+    RUN_TEST(data_frame_no_match_id_filter_remote);
 #endif
-    RUN_TEST(test_remote_frame_no_match_identifier_ignore_rtr_bit);
-    RUN_TEST(test_remote_frame_no_match_identifier_rtr_bit_is_remote_for_filter_and_frame);
+    RUN_TEST(remote_frame_no_match_id_filter_both);
+    RUN_TEST(remote_frame_no_match_idfilter_remote);
 #if defined(ARDUINO_ARCH_ESP32)
-    RUN_TEST(test_remote_frame_no_match_identifier_rtr_bit_not_matching);
+    RUN_TEST(remote_frame_no_match_id_filter_data);
 #endif
+    RUN_TEST(data_frame_same_id_not_loopback);
     UNITY_END();
 }
 
