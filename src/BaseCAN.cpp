@@ -2,10 +2,6 @@
 
 BaseCAN::BaseCAN()
 {
-    // if (pinSHDN != NC)
-    // {
-    //     pinMode(pinSHDN, OUTPUT);
-    // }
     _Serial = &Serial;
     mode = CAN_STANDARD;
 }
@@ -88,8 +84,8 @@ CanTiming BaseCAN::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
     _Serial->print(timing.tseg1);
     _Serial->print(", nominalTimeSeg2:");
     _Serial->print(timing.tseg2);
-    // _Serial->print(", samplePoint:");
-    // _Serial->println(samplePoint);
+    _Serial->print(", samplePoint:");
+    _Serial->println(samplePoint);
 
 #endif
     return timing;

@@ -29,6 +29,11 @@ STM_FDCAN::STM_FDCAN(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : filter_
   STM_FDCAN::pinTX_ = pinTX;
   STM_FDCAN::pinSHDN_ = pinSHDN;
 
+  if (pinSHDN != NC)
+  {
+    pinMode(pinSHDN, OUTPUT);
+  }
+
   hcan_.Instance = FDCAN1;
 }
 
@@ -48,12 +53,7 @@ bool STM_FDCAN::begin(int bitrate)
     failAndBlink(CAN_ERROR_CLOCK);
   }
 
-  __HAL_RCC_FDCAN_CLK_ENABLE();
-  // __HAL_RCC_GPIOH_CLK_ENABLE();
-  // __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  // HAL_NVIC_SetPriority(FDCAN1_IT0_IRQHandler, 0, 0);
-  // HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQHandler);
+  // __HAL_RCC_FDCAN_CLK_ENABLE();
 
 #if defined(FDCAN1_IT0_IRQn)
   HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
@@ -63,11 +63,11 @@ bool STM_FDCAN::begin(int bitrate)
 
   CanTiming timing = solveCanTiming(clockFreq, bitrate);
   FDCAN_InitTypeDef *init = &(hcan_.Init);
-
+  init->ClockDivider = FDCAN_CLOCK_DIV1;
   init->FrameFormat = FDCAN_FRAME_CLASSIC; // TODO: We may want to support faster FDCAN_FRAME_FD_BRS;
   init->Mode = mode == CAN_LOOPBACK ? FDCAN_MODE_INTERNAL_LOOPBACK : FDCAN_MODE_NORMAL;
   init->AutoRetransmission = DISABLE;
-  init->TransmitPause = DISABLE;
+  init->TransmitPause = ENABLE;
   init->ProtocolException = DISABLE;
 
   init->NominalPrescaler = (uint16_t)timing.prescaler;
@@ -76,13 +76,13 @@ bool STM_FDCAN::begin(int bitrate)
   init->NominalTimeSeg2 = timing.tseg2;
 
   // TODO: If we support proper FD frames then we'll need to set the following too
-  init->DataPrescaler = (uint16_t)timing.prescaler; //<- max is 32
-  init->DataSyncJumpWidth = 1;
-  init->DataTimeSeg1 = timing.tseg1;
-  init->DataTimeSeg2 = timing.tseg2;
+  // init->DataPrescaler = (uint16_t)timing.prescaler; //<- max is 32
+  // init->DataSyncJumpWidth = 1;
+  // init->DataTimeSeg1 = timing.tseg1;
+  // init->DataTimeSeg2 = timing.tseg2;
 
-  init->StdFiltersNbr = 1;
-  init->ExtFiltersNbr = 1;
+  init->StdFiltersNbr = 8;
+  init->ExtFiltersNbr = 8;
   init->TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
 
 #if defined(STM32H7)
@@ -99,10 +99,8 @@ bool STM_FDCAN::begin(int bitrate)
   init->TxFifoQueueElmtsNbr = 8;
   init->TxElmtSize = FDCAN_DATA_BYTES_8;
 #endif
-
   logStatus('i',
             HAL_FDCAN_Init(&hcan_));
-
   if (pinSHDN_ != NC)
   {
     digitalWrite(pinSHDN_, LOW);
