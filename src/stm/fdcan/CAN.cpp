@@ -35,6 +35,7 @@ STM_FDCAN::STM_FDCAN(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : filter_
   }
 
   hcan_.Instance = FDCAN1;
+  mode = CAN_NORMAL;
 }
 
 bool STM_FDCAN::begin(int bitrate)

@@ -27,6 +27,8 @@ STM_CAN::STM_CAN(uint16_t pinRX, uint16_t pinTX, uint16_t pinSHDN) : filter_(Can
   {
     pinMode(pinSHDN, OUTPUT);
   }
+
+  mode = CAN_NORMAL;
 }
 
 bool STM_CAN::begin(int bitrate)

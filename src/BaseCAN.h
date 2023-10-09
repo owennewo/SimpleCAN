@@ -21,8 +21,8 @@
 
 enum CanMode
 {
-    CAN_STANDARD = 0x00U,
-    CAN_LOOPBACK = 0x01U,
+    CAN_NORMAL = 0x00U,   // messages will go to tranceiver
+    CAN_LOOPBACK = 0x01U, // messages will go to internal loopback
     // CAN_LOOPBACK_EXTERNAL = 0x02U,  <-- some boards support this
 };
 

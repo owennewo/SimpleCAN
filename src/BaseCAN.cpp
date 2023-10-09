@@ -3,7 +3,7 @@
 BaseCAN::BaseCAN()
 {
     _Serial = &Serial;
-    mode = CAN_STANDARD;
+    mode = CAN_NORMAL;
 }
 
 bool BaseCAN::begin(int can_bitrate)
@@ -19,7 +19,7 @@ int BaseCAN::enableInternalLoopback()
 
 int BaseCAN::disableInternalLoopback()
 {
-    BaseCAN::mode = CAN_STANDARD;
+    BaseCAN::mode = CAN_NORMAL;
     return 1;
 }
 

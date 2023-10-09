@@ -24,7 +24,7 @@ ESP_TWAI_CAN::ESP_TWAI_CAN(uint32_t pinRX, uint32_t pinTX, uint32_t pinSHDN)
         .acceptance_mask = 0x00000000, // all bits must match impossible mask (reject all)
         .single_filter = true};
 
-    mode = CAN_STANDARD;
+    mode = CAN_NORMAL;
 }
 
 bool ESP_TWAI_CAN::begin(int can_bitrate)
