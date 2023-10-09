@@ -2,7 +2,7 @@
 
 This library if for microcontrollers with an onboard CAN Controller.  
 
-Esp32 and high-end STM32 have Can Controllers, but its worth checking on datasheets as it isn't always obvious e.g. blackpill_f411ce doesn't support CAN byt f405 often does.
+Esp32 and high-end STM32 have onboard CAN Controllers. For STM, it isn't always obvious if it supports CAN e.g. blackpill_f411ce doesn't support CAN but f405 often does.
 
 Partially tested on stm (using can and fdcan hal lib) and esp32 (using TWAI lib):
  - stm_fdcan
@@ -21,8 +21,10 @@ There are some small areas where this is not possible (E.g. the use of pre-initi
 
 This aims to be a true Hardware Abstraction across multiple vendor/series.
 
-
 By true, I mean that you could build Messages on this that would work across esp32, stm can2b, stm fdcan. Same API, different hardware.
+
+## Examples
+The examples folder has examples of sending/receiving standard/extended frames in loopback and normal mode. 
 
 ## Unit test
 
