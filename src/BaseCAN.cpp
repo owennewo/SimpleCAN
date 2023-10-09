@@ -58,7 +58,7 @@ CanTiming BaseCAN::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
     }
 
     timing.prescaler = clockFreq / (bitrate * timeQuanta);
-    timing.sjw = 1;
+    timing.sjw = 3;
     timing.tseg1 = uint32_t(0.875 * timeQuanta) - 1;
 
     float samplePoint = (1.0 + timing.tseg1) / timeQuanta;
@@ -94,25 +94,6 @@ CanTiming BaseCAN::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
 void BaseCAN::logMessage(CanMsg const *msg)
 {
     msg->printTo(*_Serial);
-    // _Serial->print(frame->identifier, HEX);
-    // _Serial->print(" [");
-
-    // // uint8_t length = dlcToLength(dataLength);
-    // _Serial->print(frame->dataLength);
-    // _Serial->print("] ");
-    // if (frame->isRTR)
-    // {
-    //     _Serial->print("R");
-    // }
-    // else
-    // {
-    //     for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
-    //     {
-    //         _Serial->print(frame->data[byte_index], HEX);
-    //         _Serial->print(" ");
-    //     }
-    // }
-    // _Serial->println();
 }
 
 void BaseCAN::failAndBlink(CanErrorType errorType)

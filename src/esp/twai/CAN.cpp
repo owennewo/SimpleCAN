@@ -24,7 +24,7 @@ ESP_TWAI_CAN::ESP_TWAI_CAN(uint32_t pinRX, uint32_t pinTX, uint32_t pinSHDN)
         .acceptance_mask = 0x00000000, // all bits must match impossible mask (reject all)
         .single_filter = true};
 
-    // _mode = CAN_LOOPBACK;
+    mode = CAN_STANDARD;
 }
 
 bool ESP_TWAI_CAN::begin(int can_bitrate)
@@ -40,17 +40,16 @@ bool ESP_TWAI_CAN::begin(int can_bitrate)
         .alerts_enabled = TWAI_ALERT_NONE,
         .clkout_divider = 0};
 
-    _timing_config = {};
-
     const uint32_t clockFreq = APB_CLK_FREQ;
 
     CanTiming timing = solveCanTiming(clockFreq, (uint32_t)can_bitrate, 2); // <-- multiplier of 2 will ensure prescaler is even (as per spec)
 
-    _timing_config.brp = timing.prescaler;
-    _timing_config.tseg_1 = timing.tseg1;
-    _timing_config.tseg_2 = timing.tseg2;
-    _timing_config.sjw = timing.sjw;
-    _timing_config.triple_sampling = false;
+    _timing_config = {
+        .brp = timing.prescaler,
+        .tseg_1 = (uint8_t)timing.tseg1,
+        .tseg_2 = (uint8_t)timing.tseg2,
+        .sjw = (uint8_t)timing.sjw,
+        .triple_sampling = false};
 
     logStatus('i',
               twai_driver_install(&_general_config, &_timing_config, &_filter_config));
