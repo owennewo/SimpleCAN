@@ -1,31 +1,33 @@
 #if defined(ARDUINO_ARCH_ESP32)
 
-#include "can.h"
+#include "CAN.h"
 #include <Arduino.h>
 
-void (*Can::receiveCallback)(CanFrame *rxMessage);
+void (*ESP_TWAI_CAN::receiveCallback)(CanMsg *rxMessage);
 twai_message_t _rxEspFrame = {};
 twai_message_t _txEspFrame = {};
 twai_status_info_t _statusInfo = {};
 
-uint16_t Can::_pinRX;
-uint16_t Can::_pinTX;
-uint16_t Can::_pinSHDN;
+uint16_t ESP_TWAI_CAN::_pinRX;
+uint16_t ESP_TWAI_CAN::_pinTX;
+uint16_t ESP_TWAI_CAN::_pinSHDN;
 
-Can::Can(uint32_t pinRX, uint32_t pinTX, uint32_t pinSHDN)
+ESP_TWAI_CAN::ESP_TWAI_CAN(uint32_t pinRX, uint32_t pinTX, uint32_t pinSHDN)
 {
     pinMode(pinSHDN, OUTPUT);
     digitalWrite(pinSHDN, HIGH);
-    Can::_pinRX = pinRX;
-    Can::_pinTX = pinTX;
-    Can::_pinSHDN = pinSHDN;
+    ESP_TWAI_CAN::_pinRX = pinRX;
+    ESP_TWAI_CAN::_pinTX = pinTX;
+    ESP_TWAI_CAN::_pinSHDN = pinSHDN;
     _filter_config = {
         .acceptance_code = 0xFFFFFFFF, // impossible identifier (larger than 29bits)
         .acceptance_mask = 0x00000000, // all bits must match impossible mask (reject all)
         .single_filter = true};
+
+    mode = CAN_NORMAL;
 }
 
-CanStatus Can::init(CanMode mode, uint32_t bitrate)
+bool ESP_TWAI_CAN::begin(int can_bitrate)
 {
     _general_config = {
         .mode = mode == CanMode::CAN_LOOPBACK ? TWAI_MODE_NO_ACK : TWAI_MODE_NORMAL,
@@ -38,105 +40,107 @@ CanStatus Can::init(CanMode mode, uint32_t bitrate)
         .alerts_enabled = TWAI_ALERT_NONE,
         .clkout_divider = 0};
 
-    _timing_config = {};
-
-    _mode = mode;
-
     const uint32_t clockFreq = APB_CLK_FREQ;
 
-    CanTiming timing = solveCanTiming(clockFreq, bitrate, 2); // <-- multiplier of 2 will ensure prescaler is even (as per spec)
+    CanTiming timing = solveCanTiming(clockFreq, (uint32_t)can_bitrate, 2); // <-- multiplier of 2 will ensure prescaler is even (as per spec)
 
-    _timing_config.brp = timing.prescaler;
-    _timing_config.tseg_1 = timing.tseg1;
-    _timing_config.tseg_2 = timing.tseg2;
-    _timing_config.sjw = timing.sjw;
-    _timing_config.triple_sampling = false;
+    _timing_config = {
+        .brp = timing.prescaler,
+        .tseg_1 = (uint8_t)timing.tseg1,
+        .tseg_2 = (uint8_t)timing.tseg2,
+        .sjw = (uint8_t)timing.sjw,
+        .triple_sampling = false};
 
-    return logStatus('i',
-                     twai_driver_install(&_general_config, &_timing_config, &_filter_config));
-}
+    logStatus('i',
+              twai_driver_install(&_general_config, &_timing_config, &_filter_config));
 
-CanStatus Can::deinit()
-{
-    return logStatus('u',
-                     twai_driver_uninstall());
-}
-
-CanStatus Can::start()
-{
     if (_pinSHDN != NC)
     {
-        digitalWrite(Can::_pinSHDN, LOW);
+        digitalWrite(ESP_TWAI_CAN::_pinSHDN, LOW);
     }
     return logStatus('s',
                      twai_start());
 }
-CanStatus Can::stop()
+
+void ESP_TWAI_CAN::end()
 {
     if (_pinSHDN != NC)
     {
-        digitalWrite(Can::_pinSHDN, HIGH);
+        digitalWrite(ESP_TWAI_CAN::_pinSHDN, HIGH);
     }
-    return logStatus('x',
-                     twai_stop());
+    logStatus('x',
+              twai_stop());
+
+    logStatus('u',
+              twai_driver_uninstall());
 }
 
-CanStatus Can::filter(FilterType filterType, uint32_t identifier, uint32_t mask, bool maskRtrBit, bool identifierRtrBit)
+void ESP_TWAI_CAN::filter(CanFilter filter)
 {
-    // it isn't possible to set filters after init, so we need to deinit and reinit
-    deinit();
 
-    if (filterType == FilterType::FILTER_ACCEPT_ALL)
+    uint32_t maskExtraBits = 0b000;
+    uint32_t identifierExtraBits = 0b000;
+
+    if (filter.getFrameType() == FILTER_DATA_FRAME)
+    {
+        maskExtraBits = 0b111;
+        identifierExtraBits = 0b000;
+    }
+    else if (filter.getFrameType() == FILTER_REMOTE_FRAME)
+    {
+        maskExtraBits = 0b111;
+        identifierExtraBits = 0b111;
+    }
+
+    if (filter.getType() == FilterType::ACCEPT_ALL)
     {
         _filter_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
     }
-    else if (filterType == FilterType::FILTER_DISABLE)
+    else if (filter.getType() == FilterType::REJECT_ALL)
     {
         // TODO: check this is valid way of disabling or find better approach
         _filter_config = {.acceptance_code = 0xFFFFFFFF, // <- this is an impossible identifier
                           .acceptance_mask = 0x00000000, // <- this means all bits must match
                           .single_filter = true};
     }
-    else if (filterType == FilterType::FILTER_MASK_STANDARD)
+    else if (filter.getType() == FilterType::MASK_STANDARD)
     {
-        // note: not attempting to support the data matching part of spec
-        uint32_t maskExtraBits = maskRtrBit ? 0b111 : 0b000;
-        uint32_t identifierExtraBits = identifierRtrBit ? 0b111 : 0b000;
 
-        _filter_config = {.acceptance_code = ((identifier << 3) | identifierExtraBits) << 18,
-                          .acceptance_mask = ~((mask << 3 | maskExtraBits) << 18), //~((mask << 3 | maskExtraBits)) << 18,
+        _filter_config = {.acceptance_code = ((filter.getIdentifier() << 3) | identifierExtraBits) << 18,
+                          .acceptance_mask = ~((filter.getMask() << 3 | maskExtraBits) << 18), //~((mask << 3 | maskExtraBits)) << 18,
                           .single_filter = true};
     }
-    else if (filterType == FilterType::FILTER_MASK_EXTENDED)
+    else if (filter.getType() == FilterType::MASK_EXTENDED)
     {
-        uint32_t maskExtraBits = maskRtrBit ? 0b111 : 0b000;
-        uint32_t identifierExtraBits = identifierRtrBit ? 0b111 : 0b000;
 
-        _filter_config = {.acceptance_code = (identifier << 3) | identifierExtraBits,
-                          .acceptance_mask = ~(mask << 3 | maskExtraBits),
+        _filter_config = {.acceptance_code = (filter.getIdentifier() << 3) | identifierExtraBits,
+                          .acceptance_mask = ~(filter.getMask() << 3 | maskExtraBits),
                           .single_filter = true};
     }
 
-    return logStatus('f',
-                     twai_driver_install(&_general_config, &_timing_config, &_filter_config));
+    // expectation is that begin() will be called after filter()
 }
 
-CanStatus Can::writeFrame(CanFrame *txFrame)
+int ESP_TWAI_CAN::write(CanMsg const &txMsg)
 {
 
-    _txEspFrame.flags = TWAI_MSG_FLAG_NONE | txFrame->isRTR ? TWAI_MSG_FLAG_RTR : 0;
-    _txEspFrame.self = _mode == CanMode::CAN_LOOPBACK ? 1 : 0;
-    _txEspFrame.identifier = txFrame->identifier;
-    _txEspFrame.data_length_code = txFrame->dataLength;
-    _txEspFrame.extd = txFrame->isExtended ? 1 : 0;
-    memcpy(_txEspFrame.data, txFrame->data, txFrame->dataLength);
+    _txEspFrame.flags = TWAI_MSG_FLAG_NONE | txMsg.isRTR() ? TWAI_MSG_FLAG_RTR : 0;
+    _txEspFrame.self = mode == CanMode::CAN_LOOPBACK ? 1 : 0;
+    _txEspFrame.identifier = txMsg.isExtendedId() ? txMsg.getExtendedId() : txMsg.getStandardId();
+    _txEspFrame.data_length_code = txMsg.data_length;
+    _txEspFrame.extd = txMsg.isExtendedId() ? 1 : 0;
+    if (txMsg.data_length > 0)
+    {
+        memcpy(_txEspFrame.data, txMsg.data, txMsg.data_length);
+    }
 
     if (logStatus('w',
                   twai_transmit(&_txEspFrame, portMAX_DELAY)) == CAN_OK)
     {
 #ifdef CAN_DEBUG
         _Serial->print("tx: ");
-        logFrame(txFrame);
+        txMsg.printTo(*_Serial);
+        _Serial->println();
 #endif
         return CAN_OK;
     }
@@ -146,39 +150,41 @@ CanStatus Can::writeFrame(CanFrame *txFrame)
     }
 }
 
-CanStatus Can::readFrame(CanFrame *rxFrame)
+CanMsg ESP_TWAI_CAN::read()
 {
+    twai_message_t _rxEspFrame;
+
     memset(&_rxEspFrame, 0, sizeof(_rxEspFrame)); // <-zero before reusing _rxHeader
 
     if (logStatus('r', twai_receive(&_rxEspFrame, 0)) == CAN_OK)
     {
-        rxFrame->dataLength = _rxEspFrame.data_length_code;
-        rxFrame->identifier = _rxEspFrame.identifier;
-        rxFrame->isRTR = _rxEspFrame.rtr;
-        rxFrame->isExtended = _rxEspFrame.extd;
-
-        memcpy(rxFrame->data, _rxEspFrame.data, rxFrame->dataLength);
+        CanMsg const rxMsg(
+            (_rxEspFrame.extd) ? CanExtendedId(_rxEspFrame.identifier, _rxEspFrame.rtr)
+                               : CanStandardId(_rxEspFrame.identifier, _rxEspFrame.rtr),
+            _rxEspFrame.data_length_code,
+            _rxEspFrame.data);
 
 #ifdef CAN_DEBUG
         _Serial->print("rx: ");
-        logFrame(rxFrame);
+        rxMsg.printTo(*_Serial);
+        _Serial->println();
 #endif
-        return CAN_OK;
+        return rxMsg;
     }
     else
     {
-        return CAN_ERROR;
+        return CanMsg(); // return empty message
     }
 }
 
-uint32_t Can::available()
+size_t ESP_TWAI_CAN::available()
 {
     twai_status_info_t esp_status = {};
     twai_get_status_info(&esp_status);
     return esp_status.msgs_to_rx;
 }
 
-CanStatus Can::logStatus(char op, esp_err_t status)
+CanStatus ESP_TWAI_CAN::logStatus(char op, esp_err_t status)
 {
 #ifdef CAN_DEBUG
     if (status != ESP_OK)
@@ -231,5 +237,13 @@ CanStatus Can::logStatus(char op, esp_err_t status)
 #endif
     return status == ESP_OK ? CAN_OK : CAN_ERROR;
 }
+
+#if CAN_HOWMANY > 0
+ESP_TWAI_CAN CAN(PIN_CAN0_RX, PIN_CAN0_TX, PIN_CAN0_SHDN);
+#endif
+
+// #if CAN_HOWMANY > 1
+// ESP_TWAI_CAN CAN1(PIN_CAN1_RX, PIN_CAN1_TX, PIN_CAN1_SHDN);
+// #endif
 
 #endif

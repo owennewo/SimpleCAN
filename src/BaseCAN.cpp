@@ -1,15 +1,29 @@
-#include "base_can.h"
+#include "BaseCAN.h"
 
-BaseCan::BaseCan()
+BaseCAN::BaseCAN()
 {
-    // if (pinSHDN != NC)
-    // {
-    //     pinMode(pinSHDN, OUTPUT);
-    // }
     _Serial = &Serial;
+    mode = CAN_NORMAL;
 }
 
-CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier)
+bool BaseCAN::begin(int can_bitrate)
+{
+    return begin(static_cast<CanBitRate>(can_bitrate));
+}
+
+int BaseCAN::enableInternalLoopback()
+{
+    BaseCAN::mode = CAN_LOOPBACK;
+    return 1;
+}
+
+int BaseCAN::disableInternalLoopback()
+{
+    BaseCAN::mode = CAN_NORMAL;
+    return 1;
+}
+
+CanTiming BaseCAN::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t multiplier)
 {
     // this algo is inspired by: http://www.bittiming.can-wiki.info/
     CanTiming timing = {};
@@ -44,7 +58,7 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
     }
 
     timing.prescaler = clockFreq / (bitrate * timeQuanta);
-    timing.sjw = 1;
+    timing.sjw = 3;
     timing.tseg1 = uint32_t(0.875 * timeQuanta) - 1;
 
     float samplePoint = (1.0 + timing.tseg1) / timeQuanta;
@@ -77,30 +91,12 @@ CanTiming BaseCan::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
     return timing;
 }
 
-void BaseCan::logFrame(CanFrame *frame)
+void BaseCAN::logMessage(CanMsg const *msg)
 {
-    _Serial->print(frame->identifier, HEX);
-    _Serial->print(" [");
-
-    // uint8_t length = dlcToLength(dataLength);
-    _Serial->print(frame->dataLength);
-    _Serial->print("] ");
-    if (frame->isRTR)
-    {
-        _Serial->print("R");
-    }
-    else
-    {
-        for (uint32_t byte_index = 0; byte_index < frame->dataLength; byte_index++)
-        {
-            _Serial->print(frame->data[byte_index], HEX);
-            _Serial->print(" ");
-        }
-    }
-    _Serial->println();
+    msg->printTo(*_Serial);
 }
 
-void BaseCan::failAndBlink(CanErrorType errorType)
+void BaseCAN::failAndBlink(CanErrorType errorType)
 {
 #ifdef CAN_DEBUG
     _Serial->print("fatal error: ");
@@ -119,7 +115,7 @@ void BaseCan::failAndBlink(CanErrorType errorType)
     }
 }
 
-void BaseCan::logTo(Stream *serial)
+void BaseCAN::logTo(Stream *serial)
 {
     _Serial = serial;
 }
