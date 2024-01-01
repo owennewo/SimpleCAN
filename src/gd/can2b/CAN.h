@@ -18,8 +18,8 @@ public:
 
     void filter(CanFilter filter) override;
 
-    CanStatus subscribe(void (*_messageReceiveCallback)() = nullptr);
-    CanStatus unsubscribe();
+    // CanStatus subscribe(void (*_messageReceiveCallback)() = nullptr);
+    // CanStatus unsubscribe();
 
     int write(CanMsg const &msg) override;
     CanMsg read() override;

@@ -189,23 +189,23 @@ void GD_CAN::applyFilter()
     //           HAL_CAN_ConfigFilter(&hcan_, &filterDef));
 }
 
-CanStatus GD_CAN::subscribe(void (*_messageReceiveCallback)())
-{
-    // TODO: subscriptions
-    // GD_CAN::callbackFunction_ = _messageReceiveCallback;
-    // return logStatus('a',
-    //                  HAL_CAN_ActivateNotification(&hcan_, CAN_IT_RX_FIFO0_MSG_PENDING));
-    return CAN_OK;
-}
+// CanStatus GD_CAN::subscribe(void (*_messageReceiveCallback)())
+// {
+//     // TODO: subscriptions
+//     // GD_CAN::callbackFunction_ = _messageReceiveCallback;
+//     // return logStatus('a',
+//     //                  HAL_CAN_ActivateNotification(&hcan_, CAN_IT_RX_FIFO0_MSG_PENDING));
+//     return CAN_OK;
+// }
 
-CanStatus GD_CAN::unsubscribe()
-{
-    // TODO: subscriptions
-    // callbackFunction_ = nullptr;
-    // return logStatus('u',
-    //                  HAL_CAN_DeactivateNotification(&hcan_, CAN_IT_RX_FIFO0_MSG_PENDING));
-    return CAN_OK;
-}
+// CanStatus GD_CAN::unsubscribe()
+// {
+//     // TODO: subscriptions
+//     // callbackFunction_ = nullptr;
+//     // return logStatus('u',
+//     //                  HAL_CAN_DeactivateNotification(&hcan_, CAN_IT_RX_FIFO0_MSG_PENDING));
+//     return CAN_OK;
+// }
 
 int GD_CAN::write(CanMsg const &txMsg)
 {
