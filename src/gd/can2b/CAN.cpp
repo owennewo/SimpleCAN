@@ -124,6 +124,9 @@ void GD_CAN::applyFilter()
     {
         filterIdHigh = filter_.getIdentifier() << 5; // make room for IDE, RTR bits (+ 3 unused)
         filterMaskHigh = filter_.getMask() << 5;
+        filterIdLow = 0x0000;
+        filterMaskLow = 0x0000;
+
     }
     else if (filter_.getType() == FilterType::MASK_EXTENDED)
     {
@@ -253,7 +256,7 @@ CanMsg GD_CAN::read()
 
     memset(&rxHeader_, 0, sizeof(rxHeader_)); // <-zero before reusing rxHeader_
 
-    uint8_t data[MAX_DATA_LENGTH];
+    // uint8_t data[MAX_DATA_LENGTH];
 
     // if (logStatus('r',
     can_message_receive(hcan_, CAN_FIFO0, &rxHeader_);
@@ -266,7 +269,7 @@ CanMsg GD_CAN::read()
         (rxHeader_.rx_ff == CAN_FF_EXTENDED) ? CanExtendedId(rxHeader_.rx_efid, rxHeader_.rx_ft == CAN_FT_REMOTE)
                                              : CanStandardId(rxHeader_.rx_sfid, rxHeader_.rx_ft == CAN_FT_REMOTE),
         rxHeader_.rx_dlen,
-        data);
+        rxHeader_.rx_data);
 
 #ifdef CAN_DEBUG
     _Serial->print("rx: ");
