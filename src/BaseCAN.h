@@ -28,6 +28,7 @@ enum CanMode
 
 enum CanErrorType
 {
+    CAN_ERROR_INIT_TIMEOUT = 0x10U,
     CAN_ERROR_CLOCK = 0x03U,
     CAN_ERROR_TIMING = 0x04U,
     CAN_ERROR_BITRATE_TOO_HIGH = 0x05U,

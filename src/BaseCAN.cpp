@@ -58,7 +58,7 @@ CanTiming BaseCAN::solveCanTiming(uint32_t clockFreq, uint32_t bitrate, uint8_t 
     }
 
     timing.prescaler = clockFreq / (bitrate * timeQuanta);
-    timing.sjw = 3;
+    timing.sjw = 1;
     timing.tseg1 = uint32_t(0.875 * timeQuanta) - 1;
 
     float samplePoint = (1.0 + timing.tseg1) / timeQuanta;
@@ -107,9 +107,9 @@ void BaseCAN::failAndBlink(CanErrorType errorType)
         for (uint8_t i = 0; i < errorType; i++)
         {
             digitalWrite(LED_BUILTIN, HIGH);
-            delay(200);
+            delay(100);
             digitalWrite(LED_BUILTIN, LOW);
-            delay(200);
+            delay(100);
         }
         delay(1000);
     }

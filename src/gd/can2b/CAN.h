@@ -6,6 +6,7 @@
 #include "BaseCAN.h"
 #include "gd32f30x.h"
 #include "gd32f30x_can.h"
+#include "gd32f30x_gpio.h"
 
 class GD_CAN : public BaseCAN
 {
