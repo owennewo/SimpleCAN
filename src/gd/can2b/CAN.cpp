@@ -78,7 +78,7 @@ bool GD_CAN::begin(int bitrate)
         failAndBlink(CAN_ERROR_BITRATE_TOO_HIGH);
     }
 
-        can_parameter_struct can_parameter;
+    can_parameter_struct can_parameter;
 
     can_deinit(hcan_);
 
@@ -109,6 +109,8 @@ bool GD_CAN::begin(int bitrate)
     can_parameter.time_segment_1 = (uint8_t) (timing.tseg1 - 1);
     can_parameter.time_segment_2 = (uint8_t) (timing.tseg2 - 1);
     can_parameter.prescaler = (uint16_t) timing.prescaler;
+    // working_mode seems badly named, but it's the only way to set loopback mode
+    can_parameter.working_mode = mode == CAN_LOOPBACK ? CAN_LOOPBACK_MODE : CAN_NORMAL_MODE;
 
     can_bitrate = bitrate;
 
